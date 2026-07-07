@@ -1,18 +1,25 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { CPRClass, Registration } from "./types";
 
-function fmtDate(d: string) {
-  const [y, m, day] = d.slice(0, 10).split("-");
+function toIso(val: unknown): string {
+  if (val instanceof Date) return val.toISOString();
+  return String(val ?? "");
+}
+
+function fmtDate(val: unknown): string {
+  const [y, m, day] = toIso(val).slice(0, 10).split("-");
   return `${m}/${day}/${y}`;
 }
 
-function fmtTime(t: string) {
-  const [h, m] = t.slice(0, 5).split(":").map(Number);
+function fmtTime(val: unknown): string {
+  const iso = toIso(val);
+  const part = iso.includes("T") ? iso.slice(11, 16) : iso.slice(0, 5);
+  const [h, m] = part.split(":").map(Number);
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
-function cardExpiry(classDate: string) {
-  const [y, m, d] = classDate.slice(0, 10).split("-");
+function cardExpiry(val: unknown): string {
+  const [y, m, d] = toIso(val).slice(0, 10).split("-");
   return `${m}/${d}/${Number(y) + 2}`;
 }
 

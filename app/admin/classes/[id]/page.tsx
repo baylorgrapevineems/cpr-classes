@@ -20,7 +20,7 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { ClassWithRegistrations, Registration } from "@/lib/types";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatDate, formatTime, toDateStr } from "@/lib/utils";
 
 type AttendanceField = "attended" | "passed";
 
@@ -76,7 +76,7 @@ export default function AdminClassDetailPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `CPR-Class-${(data?.class_date ?? id).toString().slice(0, 10)}-Forms.zip`;
+      a.download = `CPR-Class-${toDateStr(data?.class_date ?? id)}-Forms.zip`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -258,7 +258,7 @@ export default function AdminClassDetailPage() {
       {/* Class info cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { icon: Calendar, label: "Date", value: formatDate(data.class_date).replace(/,.*$/, "").trim(), sub: data.class_date.slice(0, 10) },
+          { icon: Calendar, label: "Date", value: formatDate(data.class_date).replace(/,.*$/, "").trim(), sub: toDateStr(data.class_date) },
           { icon: Clock, label: "Time", value: formatTime(data.start_time), sub: data.end_time ? `– ${formatTime(data.end_time)}` : "" },
           { icon: MapPin, label: "Location", value: data.location, sub: data.address ?? "" },
           { icon: User, label: "Instructor", value: data.instructor_name ?? "—", sub: data.course_type },

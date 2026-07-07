@@ -78,7 +78,8 @@ export async function GET(
     }));
 
     const buf      = await zip.generateAsync({ type: "nodebuffer" });
-    const filename = `CPR-Class-${cls.class_date.slice(0, 10)}-Forms.zip`;
+    const dateStr  = (String(cls.class_date)).slice(0, 10).replace("T", "").slice(0, 10);
+    const filename = `CPR-Class-${dateStr}-Forms.zip`;
 
     return new NextResponse(buf as unknown as BodyInit, {
       headers: {
