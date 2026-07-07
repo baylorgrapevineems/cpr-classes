@@ -16,6 +16,7 @@ import {
   XCircle,
   Pencil,
   AlertTriangle,
+  Download,
 } from "lucide-react";
 import { ClassWithRegistrations, Registration } from "@/lib/types";
 import { formatDate, formatTime } from "@/lib/utils";
@@ -44,6 +45,25 @@ export default function AdminClassDetailPage() {
 
   // Cancel class
   const [cancelling, setCancelling] = useState(false);
+
+  // Download forms
+  const [downloading, setDownloading] = useState(false);
+  const downloadForms = async () => {
+    setDownloading(true);
+    try {
+      const res = await fetch(`/api/admin/classes/${id}/forms`);
+      if (!res.ok) { alert("Failed to generate forms."); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `CPR-Class-${data?.class_date ?? id}-Forms.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const load = () => {
     fetch(`/api/admin/classes/${id}`)
@@ -165,6 +185,14 @@ export default function AdminClassDetailPage() {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={downloadForms}
+            disabled={downloading}
+            className="inline-flex items-center gap-1.5 text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 px-3 py-2 rounded-lg transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            {downloading ? "Generating…" : "Download Forms"}
+          </button>
           <Link
             href={`/admin/classes/${id}/edit`}
             className="inline-flex items-center gap-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors"
