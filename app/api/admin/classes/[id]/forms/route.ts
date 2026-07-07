@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthenticated, unauthorized } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import JSZip from "jszip";
-import { readFileSync } from "fs";
-import { join } from "path";
 import {
   fillCourseRoster,
   fillExamSheet,
@@ -12,10 +10,8 @@ import {
 } from "@/lib/pdf-forms";
 import type { CPRClass, Registration } from "@/lib/types";
 
-const TEMPLATES = join(process.cwd(), "public", "templates");
-
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   if (!(await isAdminAuthenticated())) return unauthorized();
@@ -36,38 +32,48 @@ export async function GET(
   const cls = classRows[0] as CPRClass;
   const regs = regRows as Registration[];
 
-  const zip = new JSZip();
+  // Use the request origin so templates are fetched from the same deployment
+  const baseUrl = req.nextUrl.origin;
 
-  // ── Class-level forms ────────────────────────────────────────────────────
-  zip.file("BLS-Course-Roster.pdf", await fillCourseRoster(cls, regs));
+  try {
+    const zip = new JSZip();
 
-  // Include blank AHA skills checklists once (can't be filled due to PDF encryption)
-  zip.file(
-    "Skills-Checklists/Adult-CPR-AED-Skills-Checklist-BLANK.pdf",
-    readFileSync(join(TEMPLATES, "Adult-CPR-and-AED-Skills-Testing-Checklist_ucm_506673.pdf"))
-  );
-  zip.file(
-    "Skills-Checklists/Infant-CPR-Skills-Checklist-BLANK.pdf",
-    readFileSync(join(TEMPLATES, "Infant-CPR-Skills-Testing-Checklist_ucm_506675.pdf"))
-  );
+    // ── Class-level forms ──────────────────────────────────────────────────
+    zip.file("BLS-Course-Roster.pdf", await fillCourseRoster(cls, regs, baseUrl));
 
-  // ── Per-student forms ────────────────────────────────────────────────────
-  const perStudent = zip.folder("Per-Student");
-  for (const reg of regs) {
-    const slug = `${reg.first_name}_${reg.last_name}`.replace(/[^a-zA-Z0-9_]/g, "_");
-    const folder = perStudent!.folder(slug)!;
-    folder.file("Exam-Sheet.pdf",        await fillExamSheet(reg, cls));
-    folder.file("Course-Evaluation.pdf", await fillCourseEvaluation(reg, cls));
-    folder.file("Skills-Label.pdf",      await makeSkillsLabel(reg, cls));
+    // Blank AHA skills checklists (encrypted PDFs — can't be modified)
+    const [adultBytes, infantBytes] = await Promise.all([
+      fetch(`${baseUrl}/templates/Adult-CPR-and-AED-Skills-Testing-Checklist_ucm_506673.pdf`).then(r => r.arrayBuffer()),
+      fetch(`${baseUrl}/templates/Infant-CPR-Skills-Testing-Checklist_ucm_506675.pdf`).then(r => r.arrayBuffer()),
+    ]);
+    zip.file("Skills-Checklists/Adult-CPR-AED-Skills-Checklist-BLANK.pdf", adultBytes);
+    zip.file("Skills-Checklists/Infant-CPR-Skills-Checklist-BLANK.pdf",    infantBytes);
+
+    // ── Per-student forms ──────────────────────────────────────────────────
+    const perStudent = zip.folder("Per-Student")!;
+    for (const reg of regs) {
+      const slug   = `${reg.first_name}_${reg.last_name}`.replace(/[^a-zA-Z0-9_]/g, "_");
+      const folder = perStudent.folder(slug)!;
+      const [exam, eval_, label] = await Promise.all([
+        fillExamSheet(reg, cls, baseUrl),
+        fillCourseEvaluation(reg, cls, baseUrl),
+        makeSkillsLabel(reg, cls),
+      ]);
+      folder.file("Exam-Sheet.pdf",        exam);
+      folder.file("Course-Evaluation.pdf", eval_);
+      folder.file("Skills-Label.pdf",      label);
+    }
+
+    const buf      = await zip.generateAsync({ type: "nodebuffer" });
+    const filename = `CPR-Class-${cls.class_date.slice(0, 10)}-Forms.zip`;
+
+    return new NextResponse(buf as unknown as BodyInit, {
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
-
-  const buf = await zip.generateAsync({ type: "nodebuffer" });
-  const filename = `CPR-Class-${cls.class_date}-Forms.zip`;
-
-  return new NextResponse(buf as unknown as BodyInit, {
-    headers: {
-      "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-    },
-  });
 }

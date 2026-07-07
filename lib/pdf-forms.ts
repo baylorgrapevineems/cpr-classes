@@ -1,13 +1,17 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import { readFileSync } from "fs";
-import { join } from "path";
 import type { CPRClass, Registration } from "./types";
 
-const TEMPLATES = join(process.cwd(), "public", "templates");
-const tpl = (name: string) => join(TEMPLATES, name);
+// Load a template PDF by fetching it from the app's own public URL.
+// This works on Vercel (public/ is served by CDN) and locally.
+async function loadTemplate(baseUrl: string, filename: string): Promise<Uint8Array> {
+  const url = `${baseUrl}/templates/${encodeURIComponent(filename)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to load template "${filename}" from ${url} (${res.status})`);
+  return new Uint8Array(await res.arrayBuffer());
+}
 
 function fmtDate(d: string) {
-  const [y, m, day] = d.split("-");
+  const [y, m, day] = d.slice(0, 10).split("-");
   return `${m}/${day}/${y}`;
 }
 
@@ -17,7 +21,7 @@ function fmtTime(t: string) {
 }
 
 function cardExpiry(classDate: string) {
-  const [y, m, d] = classDate.split("-");
+  const [y, m, d] = classDate.slice(0, 10).split("-");
   return `${m}/${d}/${Number(y) + 2}`;
 }
 
@@ -25,9 +29,10 @@ function cardExpiry(classDate: string) {
 
 export async function fillCourseRoster(
   cls: CPRClass,
-  regs: Registration[]
+  regs: Registration[],
+  baseUrl: string
 ): Promise<Uint8Array> {
-  const bytes = readFileSync(tpl("2020-Guidelines-BLS-Course-Roster_ucm_506772.pdf"));
+  const bytes = await loadTemplate(baseUrl, "2020-Guidelines-BLS-Course-Roster_ucm_506772.pdf");
   const doc = await PDFDocument.load(bytes);
   const form = doc.getForm();
 
@@ -39,7 +44,6 @@ export async function fillCourseRoster(
   const tcId           = process.env.PDF_TRAINING_CENTER_ID ?? "";
   const instructorId   = process.env.PDF_INSTRUCTOR_ID ?? "";
 
-  // Page 1 — Course info
   set("Lead Instructor",       cls.instructor_name ?? "");
   set("Lead Instructor ID#",   instructorId);
   set("Card Expriation Date",  cardExpiry(cls.class_date));
@@ -57,21 +61,19 @@ export async function fillCourseRoster(
   const passedCount = regs.filter((r) => r.passed === true).length;
   set("No of Cards", String(passedCount > 0 ? passedCount : regs.length));
 
-  // Check "BLS Course" checkbox (Check Box 27)
   try { form.getCheckBox("Check Box 27").check(); } catch {}
 
-  // Page 2 — Student roster
-  set("Date 2",              fmtDate(cls.class_date));
-  set("Course",              cls.course_type ?? "BLS");
-  set("Lead Instructor 2",   cls.instructor_name ?? "");
+  set("Date 2",                fmtDate(cls.class_date));
+  set("Course",                cls.course_type ?? "BLS");
+  set("Lead Instructor 2",     cls.instructor_name ?? "");
   set("Lead Instructor ID# 2", instructorId);
 
   regs.slice(0, 10).forEach((reg, i) => {
     const suffix = i === 0 ? "" : ` ${i + 1}`;
-    set(`Name${suffix}`,              `${reg.first_name} ${reg.last_name}`);
-    set(`Email${suffix}`,             reg.email);
-    set(`Mailing Address${suffix}`,   reg.address ?? "");
-    set(`Telephone${suffix}`,         reg.phone ?? "");
+    set(`Name${suffix}`,               `${reg.first_name} ${reg.last_name}`);
+    set(`Email${suffix}`,              reg.email);
+    set(`Mailing Address${suffix}`,    reg.address ?? "");
+    set(`Telephone${suffix}`,          reg.phone ?? "");
     const status =
       reg.passed === true  ? "Complete"   :
       reg.passed === false ? "Incomplete" : "";
@@ -86,9 +88,10 @@ export async function fillCourseRoster(
 
 export async function fillExamSheet(
   reg: Registration,
-  cls: CPRClass
+  cls: CPRClass,
+  baseUrl: string
 ): Promise<Uint8Array> {
-  const bytes = readFileSync(tpl("EXAM SHEET.pdf"));
+  const bytes = await loadTemplate(baseUrl, "EXAM SHEET.pdf");
   const doc   = await PDFDocument.load(bytes);
   const font  = await doc.embedFont(StandardFonts.Helvetica);
   const page  = doc.getPages()[0];
@@ -106,14 +109,15 @@ export async function fillExamSheet(
 
 export async function fillCourseEvaluation(
   reg: Registration,
-  cls: CPRClass
+  cls: CPRClass,
+  baseUrl: string
 ): Promise<Uint8Array> {
-  const bytes = readFileSync(tpl("2020-BLS-Classroom-Course-Evaluation_ucm_506774.pdf"));
+  const bytes = await loadTemplate(baseUrl, "2020-BLS-Classroom-Course-Evaluation_ucm_506774.pdf");
   const doc   = await PDFDocument.load(bytes);
   const font  = await doc.embedFont(StandardFonts.Helvetica);
   const page  = doc.getPages()[0];
 
-  // Only the Date changes per class; Instructor/Training Center/Location are already baked in the template
+  // Instructor/Training Center/Location are already baked into the template
   page.drawText(fmtDate(cls.class_date), {
     font, size: 11, color: rgb(0, 0, 0), x: 52, y: 712,
   });
@@ -121,9 +125,7 @@ export async function fillCourseEvaluation(
   return doc.save();
 }
 
-// ─── Skills Checklists (malformed PDFs — embed+overlay approach) ──────────────
-
-// ─── Per-student skills label (used when AHA checklists can't be modified) ───
+// ─── Per-student skills label ─────────────────────────────────────────────────
 
 export async function makeSkillsLabel(
   reg: Registration,
@@ -133,20 +135,15 @@ export async function makeSkillsLabel(
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
 
-  // Half-letter card (612 x 396) — easy to cut and attach to the printed form
-  const page = doc.addPage([612, 396]);
+  const page  = doc.addPage([612, 396]);
   const gray  = rgb(0.5, 0.5, 0.5);
   const black = rgb(0, 0, 0);
   const red   = rgb(0.8, 0.1, 0.1);
 
-  // Border
   page.drawRectangle({ x: 24, y: 24, width: 564, height: 348, borderColor: red, borderWidth: 2 });
-
-  // Header
   page.drawText("BLS Skills Testing — Student Info", { font: bold, size: 13, color: red, x: 40, y: 344 });
   page.drawLine({ start: { x: 40, y: 336 }, end: { x: 572, y: 336 }, thickness: 1, color: red });
 
-  // Student info
   page.drawText("Student Name:", { font: bold, size: 12, color: gray, x: 40, y: 308 });
   page.drawText(`${reg.first_name} ${reg.last_name}`, { font: bold, size: 20, color: black, x: 40, y: 282 });
 
@@ -159,7 +156,6 @@ export async function makeSkillsLabel(
   page.drawText("Email:", { font: bold, size: 12, color: gray, x: 40, y: 148 });
   page.drawText(reg.email, { font, size: 12, color: black, x: 40, y: 128 });
 
-  // Footer note
   page.drawLine({ start: { x: 40, y: 80 }, end: { x: 572, y: 80 }, thickness: 0.5, color: gray });
   page.drawText(
     "Print and attach to the AHA Skills Testing Checklist for this student.",
