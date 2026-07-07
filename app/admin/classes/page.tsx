@@ -18,11 +18,15 @@ import {
 import { CPRClass } from "@/lib/types";
 import { formatDate, formatTime } from "@/lib/utils";
 
+function parseDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function daysUntil(dateStr: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const cls = new Date(dateStr + "T00:00:00");
-  return Math.round((cls.getTime() - today.getTime()) / 86400000);
+  return Math.round((parseDate(dateStr).getTime() - today.getTime()) / 86400000);
 }
 
 function DaysBadge({ dateStr }: { dateStr: string }) {
@@ -54,13 +58,13 @@ function ClassCard({ cls, past }: { cls: CPRClass; past?: boolean }) {
         {/* Left — date block */}
         <div className={`shrink-0 w-14 text-center rounded-lg py-2 ${past ? "bg-gray-100" : "bg-red-50"}`}>
           <div className={`text-xs font-semibold uppercase tracking-wide ${past ? "text-gray-400" : "text-red-500"}`}>
-            {new Date(cls.class_date + "T00:00:00").toLocaleString("en-US", { month: "short" })}
+            {parseDate(cls.class_date).toLocaleString("en-US", { month: "short" })}
           </div>
           <div className={`text-2xl font-bold leading-none mt-0.5 ${past ? "text-gray-400" : "text-red-700"}`}>
-            {new Date(cls.class_date + "T00:00:00").getDate()}
+            {parseDate(cls.class_date).getDate()}
           </div>
           <div className={`text-xs ${past ? "text-gray-400" : "text-red-400"}`}>
-            {new Date(cls.class_date + "T00:00:00").getFullYear()}
+            {parseDate(cls.class_date).getFullYear()}
           </div>
         </div>
 
