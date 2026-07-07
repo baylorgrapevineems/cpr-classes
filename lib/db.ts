@@ -23,6 +23,7 @@ export async function initDb() {
       description TEXT,
       is_public BOOLEAN NOT NULL DEFAULT TRUE,
       is_cancelled BOOLEAN NOT NULL DEFAULT FALSE,
+      is_completed BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;

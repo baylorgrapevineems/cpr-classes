@@ -13,6 +13,7 @@ import {
   ChevronRight,
   AlertTriangle,
   EyeOff,
+  BadgeCheck,
 } from "lucide-react";
 import { CPRClass } from "@/lib/types";
 import { formatDate, formatTime } from "@/lib/utils";
@@ -72,6 +73,11 @@ function ClassCard({ cls, past }: { cls: CPRClass; past?: boolean }) {
             <span className="text-xs bg-red-50 text-red-700 border border-red-100 px-1.5 py-0.5 rounded">
               {cls.course_type}
             </span>
+            {cls.is_completed && (
+              <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                <BadgeCheck className="w-3 h-3" /> Done
+              </span>
+            )}
             {cls.is_cancelled && (
               <span className="inline-flex items-center gap-0.5 text-xs text-red-500 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded">
                 <AlertTriangle className="w-3 h-3" /> Cancelled

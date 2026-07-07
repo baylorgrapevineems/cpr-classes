@@ -12,6 +12,7 @@ export interface CPRClass {
   description: string | null;
   is_public: boolean;
   is_cancelled: boolean;
+  is_completed: boolean;
   created_at: string;
   registered_count?: number;
 }

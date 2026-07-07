@@ -45,8 +45,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     const instructor_name = "instructor_name" in body ? (body.instructor_name || null) : current.instructor_name;
     const max_seats = body.max_seats ?? current.max_seats;
     const description = "description" in body ? (body.description || null) : current.description;
-    const is_public = "is_public" in body ? body.is_public : current.is_public;
+    const is_public    = "is_public"    in body ? body.is_public    : current.is_public;
     const is_cancelled = "is_cancelled" in body ? body.is_cancelled : current.is_cancelled;
+    const is_completed = "is_completed" in body ? body.is_completed : current.is_completed;
 
     await sql`
       UPDATE classes SET
@@ -61,7 +62,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         max_seats = ${max_seats},
         description = ${description},
         is_public = ${is_public},
-        is_cancelled = ${is_cancelled}
+        is_cancelled = ${is_cancelled},
+        is_completed = ${is_completed}
       WHERE id = ${classId}
     `;
 

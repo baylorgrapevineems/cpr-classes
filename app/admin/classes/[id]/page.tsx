@@ -17,6 +17,7 @@ import {
   Pencil,
   AlertTriangle,
   Download,
+  BadgeCheck,
 } from "lucide-react";
 import { ClassWithRegistrations, Registration } from "@/lib/types";
 import { formatDate, formatTime } from "@/lib/utils";
@@ -45,6 +46,20 @@ export default function AdminClassDetailPage() {
 
   // Cancel class
   const [cancelling, setCancelling] = useState(false);
+
+  // Complete class
+  const [completing, setCompleting] = useState(false);
+  const toggleComplete = async () => {
+    if (!data) return;
+    setCompleting(true);
+    await fetch(`/api/admin/classes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_completed: !data.is_completed }),
+    });
+    setCompleting(false);
+    load();
+  };
 
   // Download forms
   const [downloading, setDownloading] = useState(false);
@@ -178,17 +193,36 @@ export default function AdminClassDetailPage() {
             <ChevronLeft className="w-4 h-4" /> All classes
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">{data.title}</h1>
-          {data.is_cancelled && (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded px-2 py-0.5 mt-1">
-              <AlertTriangle className="w-3 h-3" /> Cancelled
-            </span>
-          )}
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {data.is_completed && (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5">
+                <BadgeCheck className="w-3.5 h-3.5" /> Completed
+              </span>
+            )}
+            {data.is_cancelled && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded px-2 py-0.5">
+                <AlertTriangle className="w-3 h-3" /> Cancelled
+              </span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          <button
+            onClick={toggleComplete}
+            disabled={completing}
+            className={`inline-flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg transition-colors disabled:opacity-50 ${
+              data.is_completed
+                ? "text-emerald-700 bg-emerald-100 hover:bg-emerald-200 font-medium"
+                : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+            }`}
+          >
+            <BadgeCheck className="w-4 h-4" />
+            {completing ? "Saving…" : data.is_completed ? "Completed ✓" : "Mark Complete"}
+          </button>
           <button
             onClick={downloadForms}
             disabled={downloading}
-            className="inline-flex items-center gap-1.5 text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 px-3 py-2 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 px-3 py-2 rounded-lg transition-colors"
           >
             <Download className="w-4 h-4" />
             {downloading ? "Generating…" : "Download Forms"}
