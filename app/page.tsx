@@ -1,37 +1,26 @@
-export const dynamic = "force-dynamic";
+"use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Heart, MapPin, Clock, User, Calendar, ChevronRight, AlertCircle } from "lucide-react";
-import { getDb } from "@/lib/db";
 import { CPRClass } from "@/lib/types";
 import { formatDate, formatTime } from "@/lib/utils";
-
-async function getUpcomingClasses(): Promise<CPRClass[]> {
-  try {
-    const sql = getDb();
-    const rows = await sql`
-      SELECT
-        c.*,
-        COUNT(r.id)::int AS registered_count
-      FROM classes c
-      LEFT JOIN registrations r ON r.class_id = c.id
-      WHERE c.class_date >= CURRENT_DATE
-        AND c.is_public = TRUE
-      GROUP BY c.id
-      ORDER BY c.class_date ASC, c.start_time ASC
-    `;
-    return rows as CPRClass[];
-  } catch {
-    return [];
-  }
-}
 
 function seatsLeft(cls: CPRClass) {
   return cls.max_seats - (cls.registered_count ?? 0);
 }
 
-export default async function PublicHomePage() {
-  const classes = await getUpcomingClasses();
+export default function PublicHomePage() {
+  const [classes, setClasses] = useState<CPRClass[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/classes")
+      .then((r) => r.json())
+      .then((d) => setClasses(Array.isArray(d) ? d : []))
+      .catch(() => setClasses([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -73,10 +62,14 @@ export default async function PublicHomePage() {
           </div>
         </div>
 
-        {/* Class list */}
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Classes</h2>
 
-        {classes.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-16 gap-3 text-gray-400 text-sm">
+            <div className="w-4 h-4 border-2 border-gray-300 border-t-red-500 rounded-full animate-spin" />
+            Loading classes…
+          </div>
+        ) : classes.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
             <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
               <Calendar className="w-6 h-6 text-gray-400" />
@@ -133,7 +126,6 @@ export default async function PublicHomePage() {
                         )}
                       </div>
 
-                      {/* Seats + CTA */}
                       <div className="shrink-0 flex flex-col items-end gap-3 min-w-[120px]">
                         {!cls.is_cancelled && (
                           <span
