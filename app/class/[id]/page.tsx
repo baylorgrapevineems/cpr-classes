@@ -28,6 +28,7 @@ export default function ClassDetailPage() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [organization, setOrganization] = useState("");
   const [formState, setFormState] = useState<FormState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -53,7 +54,7 @@ export default function ClassDetailPage() {
       const res = await fetch(`/api/classes/${id}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ first_name: firstName, last_name: lastName, email, phone, organization }),
+        body: JSON.stringify({ first_name: firstName, last_name: lastName, email, phone, address, organization }),
       });
       const json = await res.json();
       if (!res.ok) { setErrorMsg(json.error ?? "Registration failed."); setFormState("error"); return; }
@@ -239,6 +240,15 @@ export default function ClassDetailPage() {
                         onChange={(e) => setPhone(e.target.value)}
                         className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
                         placeholder="(817) 555-0100"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-gray-600">Home Address</label>
+                      <input
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        placeholder="123 Main St, Grapevine, TX 76051"
                       />
                     </div>
                     <div className="space-y-1.5">

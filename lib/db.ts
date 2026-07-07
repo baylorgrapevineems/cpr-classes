@@ -34,6 +34,7 @@ export async function initDb() {
       last_name TEXT NOT NULL,
       email TEXT NOT NULL,
       phone TEXT,
+      address TEXT,
       organization TEXT,
       registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       attended BOOLEAN,

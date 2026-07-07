@@ -262,6 +262,7 @@ export default function AdminClassDetailPage() {
                     <div className="text-xs text-gray-400 flex flex-wrap gap-3 mt-0.5">
                       <span>{reg.email}</span>
                       {reg.phone && <span>{reg.phone}</span>}
+                      {reg.address && <span>{reg.address}</span>}
                       {reg.organization && <span>{reg.organization}</span>}
                     </div>
                   </div>

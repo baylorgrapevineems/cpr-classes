@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (cls.registered_count >= cls.max_seats) return NextResponse.json({ error: "This class is full." }, { status: 400 });
 
     const body = await req.json();
-    const { first_name, last_name, email, phone, organization } = body;
+    const { first_name, last_name, email, phone, address, organization } = body;
 
     if (!first_name?.trim() || !last_name?.trim() || !email?.trim()) {
       return NextResponse.json({ error: "First name, last name, and email are required." }, { status: 400 });
@@ -36,13 +36,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const result = await sql`
-      INSERT INTO registrations (class_id, first_name, last_name, email, phone, organization)
+      INSERT INTO registrations (class_id, first_name, last_name, email, phone, address, organization)
       VALUES (
         ${classId},
         ${first_name.trim()},
         ${last_name.trim()},
         ${email.trim().toLowerCase()},
         ${phone?.trim() || null},
+        ${address?.trim() || null},
         ${organization?.trim() || null}
       )
       RETURNING id
