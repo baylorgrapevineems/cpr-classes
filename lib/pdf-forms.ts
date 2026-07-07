@@ -1,22 +1,13 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { CPRClass, Registration } from "./types";
 
-// Load a template PDF by fetching it from the app's own public URL.
-// This works on Vercel (public/ is served by CDN) and locally.
-async function loadTemplate(baseUrl: string, filename: string): Promise<Uint8Array> {
-  const url = `${baseUrl}/templates/${encodeURIComponent(filename)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to load template "${filename}" from ${url} (${res.status})`);
-  return new Uint8Array(await res.arrayBuffer());
-}
-
 function fmtDate(d: string) {
   const [y, m, day] = d.slice(0, 10).split("-");
   return `${m}/${day}/${y}`;
 }
 
 function fmtTime(t: string) {
-  const [h, m] = t.split(":").map(Number);
+  const [h, m] = t.slice(0, 5).split(":").map(Number);
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
@@ -25,15 +16,14 @@ function cardExpiry(classDate: string) {
   return `${m}/${d}/${Number(y) + 2}`;
 }
 
-// ─── Course Roster (AcroForm — fill named fields directly) ───────────────────
+// ─── Course Roster (AcroForm) ─────────────────────────────────────────────────
 
 export async function fillCourseRoster(
   cls: CPRClass,
   regs: Registration[],
-  baseUrl: string
+  templateBytes: Uint8Array
 ): Promise<Uint8Array> {
-  const bytes = await loadTemplate(baseUrl, "2020-Guidelines-BLS-Course-Roster_ucm_506772.pdf");
-  const doc = await PDFDocument.load(bytes);
+  const doc  = await PDFDocument.load(templateBytes);
   const form = doc.getForm();
 
   const set = (name: string, val: string) => {
@@ -84,17 +74,16 @@ export async function fillCourseRoster(
   return doc.save();
 }
 
-// ─── Exam Sheet (flat PDF — coordinate overlay) ──────────────────────────────
+// ─── Exam Sheet (flat PDF — coordinate overlay) ───────────────────────────────
 
 export async function fillExamSheet(
   reg: Registration,
   cls: CPRClass,
-  baseUrl: string
+  templateBytes: Uint8Array
 ): Promise<Uint8Array> {
-  const bytes = await loadTemplate(baseUrl, "EXAM SHEET.pdf");
-  const doc   = await PDFDocument.load(bytes);
-  const font  = await doc.embedFont(StandardFonts.Helvetica);
-  const page  = doc.getPages()[0];
+  const doc  = await PDFDocument.load(templateBytes);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.getPages()[0];
 
   const draw = (text: string, x: number, y: number) =>
     page.drawText(text, { font, size: 11, color: rgb(0, 0, 0), x, y });
@@ -105,19 +94,17 @@ export async function fillExamSheet(
   return doc.save();
 }
 
-// ─── Course Evaluation (flat PDF — coordinate overlay) ───────────────────────
+// ─── Course Evaluation (flat PDF — coordinate overlay) ────────────────────────
 
 export async function fillCourseEvaluation(
   reg: Registration,
   cls: CPRClass,
-  baseUrl: string
+  templateBytes: Uint8Array
 ): Promise<Uint8Array> {
-  const bytes = await loadTemplate(baseUrl, "2020-BLS-Classroom-Course-Evaluation_ucm_506774.pdf");
-  const doc   = await PDFDocument.load(bytes);
-  const font  = await doc.embedFont(StandardFonts.Helvetica);
-  const page  = doc.getPages()[0];
+  const doc  = await PDFDocument.load(templateBytes);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.getPages()[0];
 
-  // Instructor/Training Center/Location are already baked into the template
   page.drawText(fmtDate(cls.class_date), {
     font, size: 11, color: rgb(0, 0, 0), x: 52, y: 712,
   });

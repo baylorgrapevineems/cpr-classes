@@ -67,14 +67,20 @@ export default function AdminClassDetailPage() {
     setDownloading(true);
     try {
       const res = await fetch(`/api/admin/classes/${id}/forms`);
-      if (!res.ok) { alert("Failed to generate forms."); return; }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        alert(`Failed to generate forms: ${body?.error ?? res.statusText}`);
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `CPR-Class-${data?.class_date ?? id}-Forms.zip`;
+      a.download = `CPR-Class-${(data?.class_date ?? id).toString().slice(0, 10)}-Forms.zip`;
       a.click();
       URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(`Error: ${String(e)}`);
     } finally {
       setDownloading(false);
     }
@@ -252,7 +258,7 @@ export default function AdminClassDetailPage() {
       {/* Class info cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { icon: Calendar, label: "Date", value: formatDate(data.class_date).replace(/,.*$/, "").trim(), sub: data.class_date },
+          { icon: Calendar, label: "Date", value: formatDate(data.class_date).replace(/,.*$/, "").trim(), sub: data.class_date.slice(0, 10) },
           { icon: Clock, label: "Time", value: formatTime(data.start_time), sub: data.end_time ? `– ${formatTime(data.end_time)}` : "" },
           { icon: MapPin, label: "Location", value: data.location, sub: data.address ?? "" },
           { icon: User, label: "Instructor", value: data.instructor_name ?? "—", sub: data.course_type },
