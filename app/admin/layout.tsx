@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Heart, LogOut } from "lucide-react";
+import { Heart } from "lucide-react";
+import SignOutButton from "@/components/sign-out-button";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -24,14 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               View public site
             </Link>
-            <form action="/api/auth/logout" method="POST">
-              <button
-                type="submit"
-                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 px-3 py-1.5 rounded transition-colors"
-              >
-                <LogOut className="w-3.5 h-3.5" /> Sign out
-              </button>
-            </form>
+            <SignOutButton />
           </div>
         </div>
       </header>
