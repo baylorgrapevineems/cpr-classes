@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Heart, ArrowLeft } from "lucide-react";
+import { Heart } from "lucide-react";
 
 export default function CprCardPage() {
   const [form, setForm] = useState({
@@ -42,9 +42,6 @@ export default function CprCardPage() {
           <p className="text-gray-500 text-sm">
             Thanks for your interest. We'll reach out when a class is available for you.
           </p>
-          <Link href="/" className="inline-block mt-2 text-sm text-red-600 hover:underline">
-            ← Back to classes
-          </Link>
         </div>
       </div>
     );
@@ -65,10 +62,6 @@ export default function CprCardPage() {
       </header>
 
       <main className="max-w-xl mx-auto px-4 py-10">
-        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 mb-6">
-          <ArrowLeft className="w-4 h-4" /> Back to classes
-        </Link>
-
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">I need a CPR card</h1>
