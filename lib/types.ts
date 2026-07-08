@@ -51,3 +51,16 @@ export interface Evaluation {
 export interface ClassWithRegistrations extends CPRClass {
   registrations: Registration[];
 }
+
+export interface CardRequest {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  notes: string | null;
+  created_at: string;
+  class_id: number | null;
+  class_title?: string | null;
+  class_date?: string | null;
+}

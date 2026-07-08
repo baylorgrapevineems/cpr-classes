@@ -164,6 +164,19 @@ export default function PublicHomePage() {
             })}
           </div>
         )}
+        {/* CPR card interest banner */}
+        <div className="mt-8 bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="font-semibold text-gray-900 text-sm">Don't see an available class?</p>
+            <p className="text-xs text-gray-500 mt-0.5">Submit your info and we'll reach out when a class opens up.</p>
+          </div>
+          <Link
+            href="/cpr-card"
+            className="shrink-0 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            I need a CPR card
+          </Link>
+        </div>
       </main>
 
       <footer className="border-t border-gray-200 mt-16 py-8 text-center text-xs text-gray-400">

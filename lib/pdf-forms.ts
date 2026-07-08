@@ -470,68 +470,230 @@ export async function fillExamSheet(
   return doc.save();
 }
 
-// ─── Course Evaluation (flat PDF — coordinate overlay) ────────────────────────
+// ─── Course Evaluation (built from scratch) ───────────────────────────────────
 
 import type { Evaluation } from "./types";
 
-// Maps an answer value to an X mark drawn at the given coordinate
-// Coordinates tuned to the AHA BLS Classroom Course Evaluation layout
-const EVAL_MARKS: Record<string, Record<string, [number, number]>> = {
-  inst_q1:    { yes: [109, 631], no: [109, 620] },
-  inst_q2:    { yes: [109, 600], no: [109, 589] },
-  inst_q3:    { yes: [109, 569], no: [109, 558] },
-  content_q1: { yes: [109, 516], no: [109, 505] },
-  content_q2: { too_hard: [109, 488], too_easy: [109, 477], appropriate: [109, 466] },
-  content_q3: { yes: [109, 448], no: [109, 437] },
-  content_q4: { excellent: [109, 418], good: [109, 407], fair: [109, 396], poor: [109, 385] },
-  content_q5: { yes: [109, 366], no: [109, 355] },
-  skill_q1:   { yes: [109, 304], no: [109, 293] },
-  skill_q2:   { yes: [109, 274], no: [109, 263], not_sure: [109, 252] },
-  skill_q3:   { yes: [370, 631], no: [370, 620], not_sure: [370, 609] },
-  skill_q4:   { yes: [370, 584], no: [370, 573] },
-};
+function wrapText(text: string | null | undefined, maxChars: number): string[] {
+  if (!text) return [];
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let line = "";
+  for (const w of words) {
+    const test = line ? `${line} ${w}` : w;
+    if (test.length > maxChars) { if (line) lines.push(line); line = w; }
+    else { line = test; }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
 
 export async function fillCourseEvaluation(
   reg: Registration,
   cls: CPRClass,
-  templateBytes: Uint8Array,
   eval_: Evaluation | null = null
 ): Promise<Uint8Array> {
-  const doc  = await PDFDocument.load(templateBytes);
+  void reg; // reg not needed; kept for consistent call signature
+  const doc  = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
-  const page = doc.getPages()[0];
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const page = doc.addPage([612, 792]);
+
+  const LC = 36;   // left column x
+  const RC = 308;  // right column x
+  const red   = rgb(0.73, 0.12, 0.12);
   const black = rgb(0, 0, 0);
+  const gray  = rgb(0.45, 0.45, 0.45);
+  const white = rgb(1, 1, 1);
 
-  // Date header
-  page.drawText(fmtDate(cls.class_date), { font, size: 10, color: black, x: 52, y: 712 });
+  const t = (s: string, x: number, y: number, sz: number, f = font, c = black) =>
+    page.drawText(s, { font: f, size: sz, color: c, x, y });
 
-  if (eval_) {
-    // Draw X marks for each answered question
-    for (const [field, coords] of Object.entries(EVAL_MARKS)) {
-      const answer = eval_[field as keyof Evaluation] as string | null;
-      if (answer && coords[answer]) {
-        const [x, y] = coords[answer];
-        page.drawText("X", { font, size: 10, color: black, x, y });
-      }
+  const chk = (x: number, y: number, on: boolean) => {
+    page.drawRectangle({ x, y, width: 6, height: 6, color: white, borderColor: black, borderWidth: 0.5 });
+    if (on) {
+      page.drawLine({ start: { x: x+1, y: y+1 }, end: { x: x+5, y: y+5 }, thickness: 1, color: black });
+      page.drawLine({ start: { x: x+5, y: y+1 }, end: { x: x+1, y: y+5 }, thickness: 1, color: black });
     }
+  };
 
-    // Open-ended comments (up to 4 lines each, 45 chars wide)
-    const drawComment = (text: string, startX: number, startY: number, lineH = 11) => {
-      const words = text.split(" ");
-      let line = ""; let y = startY;
-      for (const w of words) {
-        if ((line + " " + w).trim().length > 46) {
-          page.drawText(line.trim(), { font, size: 8, color: black, x: startX, y });
-          y -= lineH; line = w;
-        } else { line = (line + " " + w).trim(); }
-      }
-      if (line) page.drawText(line.trim(), { font, size: 8, color: black, x: startX, y });
-    };
+  const pick = (field: string, value: string) =>
+    eval_ ? (eval_[field as keyof Evaluation] as string | null) === value : false;
 
-    if (eval_.comment_learning)  drawComment(eval_.comment_learning,  370, 540);
-    if (eval_.comment_strengths) drawComment(eval_.comment_strengths, 370, 468);
-    if (eval_.comment_future)    drawComment(eval_.comment_future,    370, 398);
+  const ch = (label: string, field: string, value: string, x: number, y: number) => {
+    chk(x, y, pick(field, value));
+    t(label, x + 9, y + 0.5, 8);
+  };
+
+  // ── Header ──────────────────────────────────────────────────────────────────
+  t("BLS Classroom",     LC,  775, 13, bold, red);
+  t("Course Evaluation", LC,  760, 13, bold, red);
+  t("American Heart",    446, 770, 7.5, bold, black);
+  t("Association.",      446, 759, 7.5, bold, black);
+  page.drawLine({ start: { x: LC, y: 748 }, end: { x: 576, y: 748 }, thickness: 2, color: red });
+
+  // Date / Instructor row
+  t("Date", LC, 736, 8, bold);
+  page.drawLine({ start: { x: LC+25, y: 735 }, end: { x: 200, y: 735 }, thickness: 0.5, color: black });
+  t(fmtDate(cls.class_date), LC+27, 736, 8);
+  t("Instructor(s)", 210, 736, 8, bold);
+  page.drawLine({ start: { x: 258, y: 735 }, end: { x: 576, y: 735 }, thickness: 0.5, color: black });
+  t(cls.instructor_name ?? "", 260, 736, 8);
+
+  // Training Center / Location row
+  const tc = process.env.PDF_TRAINING_CENTER ?? "Grapevine Fire Dept";
+  t("Training Center", LC, 723, 8, bold);
+  page.drawLine({ start: { x: LC+74, y: 722 }, end: { x: 200, y: 722 }, thickness: 0.5, color: black });
+  t(tc, LC+76, 723, 8);
+  t("Location", 210, 723, 8, bold);
+  page.drawLine({ start: { x: 244, y: 722 }, end: { x: 576, y: 722 }, thickness: 0.5, color: black });
+  t(cls.location, 246, 723, 8);
+
+  // Column divider
+  page.drawLine({ start: { x: 300, y: 710 }, end: { x: 300, y: 50 }, thickness: 0.4, color: gray });
+
+  // ── LEFT COLUMN ─────────────────────────────────────────────────────────────
+  let ly = 705;
+
+  // Instructor section
+  t("Please answer the following questions", LC, ly, 8); ly -= 10;
+  t("about your Instructor.", LC, ly, 8, bold); ly -= 12;
+  t("My Instructor:", LC, ly, 8); ly -= 13;
+
+  t("1. Provided instruction and help during", LC, ly, 8); ly -= 9;
+  t("   my skills practice session", LC, ly, 8); ly -= 11;
+  ch("a. Yes", "inst_q1", "yes", LC+6, ly); ly -= 10;
+  ch("b. No",  "inst_q1", "no",  LC+6, ly); ly -= 14;
+
+  t("2. Answered all of my questions before", LC, ly, 8); ly -= 9;
+  t("   my skills test", LC, ly, 8); ly -= 11;
+  ch("a. Yes", "inst_q2", "yes", LC+6, ly); ly -= 10;
+  ch("b. No",  "inst_q2", "no",  LC+6, ly); ly -= 14;
+
+  t("3. Was professional and courteous to", LC, ly, 8); ly -= 9;
+  t("   the students", LC, ly, 8); ly -= 11;
+  ch("a. Yes", "inst_q3", "yes", LC+6, ly); ly -= 10;
+  ch("b. No",  "inst_q3", "no",  LC+6, ly); ly -= 16;
+
+  // Course content section
+  t("Please answer the following questions", LC, ly, 8); ly -= 10;
+  t("about the course content.", LC, ly, 8, bold); ly -= 12;
+
+  t("1. The course learning objectives were", LC, ly, 8); ly -= 9;
+  t("   clear.", LC, ly, 8); ly -= 11;
+  ch("a. Yes", "content_q1", "yes", LC+6, ly); ly -= 10;
+  ch("b. No",  "content_q1", "no",  LC+6, ly); ly -= 13;
+
+  t("2. The overall level of difficulty of", LC, ly, 8); ly -= 9;
+  t("   the course was", LC, ly, 8); ly -= 11;
+  ch("a. Too hard",    "content_q2", "too_hard",    LC+6, ly); ly -= 10;
+  ch("b. Too easy",    "content_q2", "too_easy",    LC+6, ly); ly -= 10;
+  ch("c. Appropriate", "content_q2", "appropriate", LC+6, ly); ly -= 13;
+
+  t("3. The content was presented clearly.", LC, ly, 8); ly -= 11;
+  ch("a. Yes", "content_q3", "yes", LC+6, ly); ly -= 10;
+  ch("b. No",  "content_q3", "no",  LC+6, ly); ly -= 13;
+
+  t("4. The quality of videos and written", LC, ly, 8); ly -= 9;
+  t("   materials was", LC, ly, 8); ly -= 11;
+  ch("a. Excellent", "content_q4", "excellent", LC+6, ly); ly -= 10;
+  ch("b. Good",      "content_q4", "good",      LC+6, ly); ly -= 10;
+  ch("c. Fair",      "content_q4", "fair",      LC+6, ly); ly -= 10;
+  ch("d. Poor",      "content_q4", "poor",      LC+6, ly); ly -= 13;
+
+  t("5. The equipment was clean and in good", LC, ly, 8); ly -= 9;
+  t("   working condition.", LC, ly, 8); ly -= 11;
+  ch("a. Yes", "content_q5", "yes", LC+6, ly); ly -= 10;
+  ch("b. No",  "content_q5", "no",  LC+6, ly); ly -= 16;
+
+  // Skill mastery Q1-2 (left column)
+  t("Please answer the following questions", LC, ly, 8); ly -= 10;
+  t("about your skill mastery.", LC, ly, 8, bold); ly -= 12;
+
+  t("1. The course prepared me to", LC, ly, 8); ly -= 9;
+  t("   successfully pass the skills session.", LC, ly, 8); ly -= 11;
+  ch("a. Yes", "skill_q1", "yes", LC+6, ly); ly -= 10;
+  ch("b. No",  "skill_q1", "no",  LC+6, ly); ly -= 13;
+
+  t("2. I am confident I can use the skills", LC, ly, 8); ly -= 9;
+  t("   the course taught me.", LC, ly, 8); ly -= 11;
+  ch("a. Yes",      "skill_q2", "yes",      LC+6, ly); ly -= 10;
+  ch("b. No",       "skill_q2", "no",       LC+6, ly); ly -= 10;
+  ch("c. Not sure", "skill_q2", "not_sure", LC+6, ly);
+
+  // ── RIGHT COLUMN ─────────────────────────────────────────────────────────────
+  let ry = 705;
+
+  // Skill mastery Q3-4
+  t("3. I will respond in an emergency", RC, ry, 8); ry -= 9;
+  t("   because of the skills I learned", RC, ry, 8); ry -= 9;
+  t("   in this course.", RC, ry, 8); ry -= 11;
+  ch("a. Yes",      "skill_q3", "yes",      RC+6, ry); ry -= 10;
+  ch("b. No",       "skill_q3", "no",       RC+6, ry); ry -= 10;
+  ch("c. Not sure", "skill_q3", "not_sure", RC+6, ry); ry -= 14;
+
+  t("4. I took this course to obtain", RC, ry, 8); ry -= 9;
+  t("   professional education credit or", RC, ry, 8); ry -= 9;
+  t("   continuing education credit.", RC, ry, 8); ry -= 11;
+  ch("a. Yes", "skill_q4", "yes", RC+6, ry); ry -= 10;
+  ch("b. No",  "skill_q4", "no",  RC+6, ry); ry -= 18;
+
+  // Optional questions
+  t("Optional questions:", RC, ry, 8.5, bold); ry -= 14;
+
+  // Comment 1: comment_learning
+  t("Have you previously taken this course via", RC, ry, 7.5); ry -= 9;
+  t("another method, such as in a classroom or", RC, ry, 7.5); ry -= 9;
+  t("online? Which learning method do you", RC, ry, 7.5); ry -= 9;
+  t("prefer and why?", RC, ry, 7.5); ry -= 12;
+  {
+    const lines = wrapText(eval_?.comment_learning, 46);
+    for (let i = 0; i < 4; i++) {
+      page.drawLine({ start: { x: RC, y: ry - i*12 }, end: { x: 576, y: ry - i*12 }, thickness: 0.4, color: gray });
+      if (lines[i]) t(lines[i], RC+1, ry - i*12 + 2, 7);
+    }
+    ry -= 4*12 + 10;
   }
+
+  // Comment 2: comment_strengths
+  t("Were there any strengths or weaknesses of", RC, ry, 7.5); ry -= 9;
+  t("the course that you would like to comment", RC, ry, 7.5); ry -= 9;
+  t("on?", RC, ry, 7.5); ry -= 12;
+  {
+    const lines = wrapText(eval_?.comment_strengths, 46);
+    for (let i = 0; i < 4; i++) {
+      page.drawLine({ start: { x: RC, y: ry - i*12 }, end: { x: 576, y: ry - i*12 }, thickness: 0.4, color: gray });
+      if (lines[i]) t(lines[i], RC+1, ry - i*12 + 2, 7);
+    }
+    ry -= 4*12 + 10;
+  }
+
+  // Comment 3: comment_future
+  t("What would you like to see in future", RC, ry, 7.5); ry -= 9;
+  t("courses developed by the AHA?", RC, ry, 7.5); ry -= 12;
+  {
+    const lines = wrapText(eval_?.comment_future, 46);
+    for (let i = 0; i < 3; i++) {
+      page.drawLine({ start: { x: RC, y: ry - i*12 }, end: { x: 576, y: ry - i*12 }, thickness: 0.4, color: gray });
+      if (lines[i]) t(lines[i], RC+1, ry - i*12 + 2, 7);
+    }
+    ry -= 3*12 + 14;
+  }
+
+  // After Completing
+  t("After Completing This Evaluation", RC, ry, 8.5, bold); ry -= 12;
+  t("Please return this evaluation to your", RC, ry, 7.5); ry -= 9;
+  t("Instructor before you leave the class.", RC, ry, 7.5); ry -= 12;
+  t("Alternatively, you can send the evaluation", RC, ry, 7.5); ry -= 9;
+  t("to your Instructor's Training Center. Ask", RC, ry, 7.5); ry -= 9;
+  t("your Instructor for the contact information.", RC, ry, 7.5); ry -= 12;
+  t("If you have significant problems or concerns", RC, ry, 7.5); ry -= 9;
+  t("with your course, please contact the AHA", RC, ry, 7.5); ry -= 9;
+  t("at 877-AHA-4CPR.", RC, ry, 7.5);
+
+  // ── Footer ──────────────────────────────────────────────────────────────────
+  page.drawLine({ start: { x: LC, y: 45 }, end: { x: 576, y: 45 }, thickness: 1.5, color: red });
+  t("© 2020 American Heart Association", 612/2 - 84, 32, 7, font, gray);
 
   return doc.save();
 }

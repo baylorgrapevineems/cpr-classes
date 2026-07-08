@@ -9,7 +9,18 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <a
+          href="/admin"
+          style={{
+            position: "fixed", bottom: 10, right: 12,
+            fontSize: 11, color: "#bbb", textDecoration: "none", opacity: 0.7,
+          }}
+        >
+          Admin
+        </a>
+      </body>
     </html>
   );
 }

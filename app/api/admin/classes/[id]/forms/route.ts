@@ -47,12 +47,11 @@ export async function GET(
   try {
     const base = req.nextUrl.origin;
 
-    // Fetch templates in parallel (skills checklists built from scratch — no templates needed)
-    const [rosterBytes, examBytes, evalBytes] =
+    // Fetch templates in parallel (skills checklist and eval built from scratch)
+    const [rosterBytes, examBytes] =
       await Promise.all([
         fetchTemplate(base, "2020-Guidelines-BLS-Course-Roster_ucm_506772.pdf"),
         fetchTemplate(base, "EXAM SHEET.pdf"),
-        fetchTemplate(base, "2020-BLS-Classroom-Course-Evaluation_ucm_506774.pdf"),
       ]);
 
     const zip = new JSZip();
@@ -68,7 +67,7 @@ export async function GET(
       const evalData = evalByRegId[reg.id] ?? null;
       const [exam, eval_, adultChecklist, infantChecklist] = await Promise.all([
         fillExamSheet(reg, cls, examBytes),
-        fillCourseEvaluation(reg, cls, evalBytes, evalData),
+        fillCourseEvaluation(reg, cls, evalData),
         makeAdultSkillsChecklist(reg, cls),
         makeInfantSkillsChecklist(reg, cls),
       ]);

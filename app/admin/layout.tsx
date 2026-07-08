@@ -15,6 +15,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               CPR Class Manager
             </Link>
             <span className="text-gray-200 text-sm">|</span>
+            <Link href="/admin/interests" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
+              Card Requests
+            </Link>
+            <span className="text-gray-200 text-sm">|</span>
             <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded font-medium">Admin</span>
           </div>
           <div className="flex items-center gap-1">

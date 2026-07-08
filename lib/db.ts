@@ -61,4 +61,16 @@ export async function initDb() {
   `;
   await sql`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS eval_token TEXT UNIQUE`;
   await sql`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS eval_sent_at TIMESTAMPTZ`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS card_requests (
+      id SERIAL PRIMARY KEY,
+      first_name TEXT NOT NULL,
+      last_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL
+    )
+  `;
 }
