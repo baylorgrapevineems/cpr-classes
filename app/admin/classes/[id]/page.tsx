@@ -62,6 +62,30 @@ export default function AdminClassDetailPage() {
     load();
   };
 
+  // Per-student sending state
+  const [sendingStudentQuiz, setSendingStudentQuiz] = useState<number | null>(null);
+  const [sendingStudentEval, setSendingStudentEval] = useState<number | null>(null);
+
+  const sendStudentQuiz = async (reg: Registration) => {
+    if (!confirm(`Send quiz email to ${reg.first_name} ${reg.last_name}?`)) return;
+    setSendingStudentQuiz(reg.id);
+    const res = await fetch(`/api/admin/registrations/${reg.id}/send-quiz`, { method: "POST" });
+    const d = await res.json().catch(() => null);
+    if (!res.ok) alert(`Failed: ${d?.error ?? res.statusText}`);
+    setSendingStudentQuiz(null);
+    load();
+  };
+
+  const sendStudentEval = async (reg: Registration) => {
+    if (!confirm(`Send evaluation email to ${reg.first_name} ${reg.last_name}?`)) return;
+    setSendingStudentEval(reg.id);
+    const res = await fetch(`/api/admin/registrations/${reg.id}/send-eval`, { method: "POST" });
+    const d = await res.json().catch(() => null);
+    if (!res.ok) alert(`Failed: ${d?.error ?? res.statusText}`);
+    setSendingStudentEval(null);
+    load();
+  };
+
   // Send quiz
   const [sendingQuiz, setSendingQuiz] = useState(false);
   const sendQuiz = async () => {
@@ -414,6 +438,22 @@ export default function AdminClassDetailPage() {
                       Passed:
                       <AttendancePill value={reg.passed} onClick={() => toggleAttendance(reg, "passed")} />
                     </div>
+                    <button
+                      onClick={() => sendStudentQuiz(reg)}
+                      disabled={sendingStudentQuiz === reg.id}
+                      className="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 px-2 py-1 rounded transition-colors"
+                      title="Send quiz email to this student"
+                    >
+                      {sendingStudentQuiz === reg.id ? "…" : "Quiz"}
+                    </button>
+                    <button
+                      onClick={() => sendStudentEval(reg)}
+                      disabled={sendingStudentEval === reg.id}
+                      className="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 px-2 py-1 rounded transition-colors"
+                      title="Send evaluation email to this student"
+                    >
+                      {sendingStudentEval === reg.id ? "…" : "Eval"}
+                    </button>
                     <button
                       onClick={() => setExpanded(expanded === reg.id ? null : reg.id)}
                       className="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
