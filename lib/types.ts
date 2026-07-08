@@ -36,6 +36,22 @@ export interface Registration {
   eval_token: string | null;
   eval_sent_at: string | null;
   eval_submitted?: boolean;
+  quiz_token: string | null;
+  quiz_sent_at: string | null;
+  quiz_version: string | null;
+  quiz_submitted?: boolean;
+  quiz_score?: number | null;
+  quiz_passed?: boolean | null;
+}
+
+export interface QuizResult {
+  id: number;
+  registration_id: number;
+  submitted_at: string;
+  version: string;
+  answers: Record<string, string>;
+  score: number;
+  passed: boolean;
 }
 
 export interface Evaluation {

@@ -61,6 +61,20 @@ export async function initDb() {
   `;
   await sql`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS eval_token TEXT UNIQUE`;
   await sql`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS eval_sent_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS quiz_token TEXT UNIQUE`;
+  await sql`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS quiz_sent_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS quiz_version TEXT`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS quiz_results (
+      id SERIAL PRIMARY KEY,
+      registration_id INTEGER NOT NULL UNIQUE REFERENCES registrations(id) ON DELETE CASCADE,
+      submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      version TEXT NOT NULL,
+      answers JSONB NOT NULL,
+      score INTEGER NOT NULL,
+      passed BOOLEAN NOT NULL
+    )
+  `;
   await sql`
     CREATE TABLE IF NOT EXISTS card_requests (
       id SERIAL PRIMARY KEY,

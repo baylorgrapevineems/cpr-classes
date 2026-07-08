@@ -62,6 +62,22 @@ export default function AdminClassDetailPage() {
     load();
   };
 
+  // Send quiz
+  const [sendingQuiz, setSendingQuiz] = useState(false);
+  const sendQuiz = async () => {
+    if (!confirm("Send quiz emails to students who haven't received one yet? (2 reference PDFs will be attached)")) return;
+    setSendingQuiz(true);
+    const res = await fetch(`/api/admin/classes/${id}/send-quiz`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ only_unsent: true }),
+    });
+    const d = await res.json().catch(() => null);
+    alert(res.ok ? `Sent ${d.sent} quiz email(s).${d.skipped ? ` ${d.skipped} failed.` : ""}` : `Failed: ${d?.error ?? res.statusText}`);
+    setSendingQuiz(false);
+    load();
+  };
+
   // Send evaluations
   const [sendingEvals, setSendingEvals] = useState(false);
   const sendEvals = async () => {
@@ -202,6 +218,8 @@ export default function AdminClassDetailPage() {
   const filled = data.registrations.length;
   const seatsLeft = data.max_seats - filled;
   const passed = data.registrations.filter((r) => r.passed === true).length;
+  const quizDone = data.registrations.filter((r) => r.quiz_submitted).length;
+  const evalDone = data.registrations.filter((r) => r.eval_submitted).length;
 
   return (
     <div className="space-y-6">
@@ -237,6 +255,14 @@ export default function AdminClassDetailPage() {
           >
             <BadgeCheck className="w-4 h-4" />
             {completing ? "Saving…" : data.is_completed ? "Completed ✓" : "Mark Complete"}
+          </button>
+          <button
+            onClick={sendQuiz}
+            disabled={sendingQuiz}
+            className="inline-flex items-center gap-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 px-3 py-2 rounded-lg transition-colors"
+          >
+            <Mail className="w-4 h-4" />
+            {sendingQuiz ? "Sending…" : "Send Quiz"}
           </button>
           <button
             onClick={sendEvals}
@@ -304,6 +330,16 @@ export default function AdminClassDetailPage() {
             <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded font-mono">
               {filled}/{data.max_seats} · {seatsLeft} open · {passed} passed
             </span>
+            {filled > 0 && (
+              <span className={`text-xs px-2 py-0.5 rounded font-mono ${quizDone === filled ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-400"}`}>
+                Quiz {quizDone}/{filled}
+              </span>
+            )}
+            {filled > 0 && (
+              <span className={`text-xs px-2 py-0.5 rounded font-mono ${evalDone === filled ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-400"}`}>
+                Eval {evalDone}/{filled}
+              </span>
+            )}
           </div>
           <button
             onClick={() => setShowAdd(true)}
@@ -347,6 +383,15 @@ export default function AdminClassDetailPage() {
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-900 text-sm flex items-center gap-1.5">
                       {reg.first_name} {reg.last_name}
+                      {reg.quiz_submitted && (
+                        <span className={`text-xs font-medium px-1.5 py-0 rounded leading-5 border ${
+                          reg.quiz_passed
+                            ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+                            : "text-red-600 bg-red-50 border-red-200"
+                        }`}>
+                          Quiz {reg.quiz_score}/25 {reg.quiz_passed ? "✓" : "✗"}
+                        </span>
+                      )}
                       {reg.eval_submitted && (
                         <span className="text-xs font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0 rounded leading-5">
                           Eval ✓
