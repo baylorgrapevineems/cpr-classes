@@ -34,6 +34,14 @@ export default function PublicHomePage() {
             <p className="font-bold text-gray-900 text-sm leading-tight">Baylor Grapevine EMS</p>
             <p className="text-xs text-gray-500 leading-tight">AHA BLS CPR Classes</p>
           </div>
+          <div className="ml-auto">
+            <Link
+              href="/admin"
+              className="text-xs font-medium text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Admin
+            </Link>
+          </div>
         </div>
       </header>
 
