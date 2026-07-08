@@ -1,8 +1,20 @@
 import Link from "next/link";
 import { Heart } from "lucide-react";
 import SignOutButton from "@/components/sign-out-button";
+import { getDb } from "@/lib/db";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+async function getPendingCardCount(): Promise<number> {
+  try {
+    const sql = getDb();
+    const rows = await sql`SELECT COUNT(*)::int AS n FROM card_requests WHERE class_id IS NULL`;
+    return Number(rows[0]?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const pending = await getPendingCardCount();
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -15,8 +27,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               CPR Class Manager
             </Link>
             <span className="text-gray-200 text-sm">|</span>
-            <Link href="/admin/interests" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
+            <Link href="/admin/interests" className="text-sm text-gray-500 hover:text-gray-900 transition-colors flex items-center gap-1.5">
               Card Requests
+              {pending > 0 && (
+                <span className="bg-red-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
+                  {pending}
+                </span>
+              )}
             </Link>
             <span className="text-gray-200 text-sm">|</span>
             <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded font-medium">Admin</span>
