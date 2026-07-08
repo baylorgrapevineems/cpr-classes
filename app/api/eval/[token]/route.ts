@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { sendEvalNotification } from "@/lib/email";
 
 // GET — load class/student info for the form
 export async function GET(
@@ -65,14 +64,6 @@ export async function POST(
       ${body.comment_learning ?? null}, ${body.comment_strengths ?? null}, ${body.comment_future ?? null}
     )
   `;
-
-  // Notify admin asynchronously — don't block the student's response
-  const row = regRows[0];
-  sendEvalNotification({
-    studentName: `${row.first_name} ${row.last_name}`,
-    classTitle:  row.title,
-    classDate:   String(row.class_date).slice(0, 10),
-  }).catch(() => {});
 
   return NextResponse.json({ ok: true });
 }

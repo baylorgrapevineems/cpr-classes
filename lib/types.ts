@@ -35,6 +35,7 @@ export interface Registration {
   notes: string | null;
   eval_token: string | null;
   eval_sent_at: string | null;
+  eval_submitted?: boolean;
 }
 
 export interface Evaluation {

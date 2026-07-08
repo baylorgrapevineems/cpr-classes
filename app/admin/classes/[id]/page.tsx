@@ -345,8 +345,13 @@ export default function AdminClassDetailPage() {
               <div key={reg.id}>
                 <div className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50">
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900 text-sm">
+                    <div className="font-medium text-gray-900 text-sm flex items-center gap-1.5">
                       {reg.first_name} {reg.last_name}
+                      {reg.eval_submitted && (
+                        <span className="text-xs font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0 rounded leading-5">
+                          Eval ✓
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-gray-400 flex flex-wrap gap-3 mt-0.5">
                       <span>{reg.email}</span>

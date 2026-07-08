@@ -14,7 +14,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     const classes = await sql`SELECT * FROM classes WHERE id = ${parseInt(id)}`;
     if (!classes[0]) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const registrations = await sql`
-      SELECT * FROM registrations WHERE class_id = ${parseInt(id)} ORDER BY registered_at ASC
+      SELECT r.*, (e.id IS NOT NULL) AS eval_submitted
+      FROM registrations r
+      LEFT JOIN evaluations e ON e.registration_id = r.id
+      WHERE r.class_id = ${parseInt(id)}
+      ORDER BY r.registered_at ASC
     `;
     return NextResponse.json({ ...classes[0], registrations });
   } catch (err) {
