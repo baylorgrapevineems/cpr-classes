@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Download,
   BadgeCheck,
+  Mail,
 } from "lucide-react";
 import { ClassWithRegistrations, Registration } from "@/lib/types";
 import { formatDate, formatTime, toDateStr } from "@/lib/utils";
@@ -58,6 +59,18 @@ export default function AdminClassDetailPage() {
       body: JSON.stringify({ is_completed: !data.is_completed }),
     });
     setCompleting(false);
+    load();
+  };
+
+  // Send evaluations
+  const [sendingEvals, setSendingEvals] = useState(false);
+  const sendEvals = async () => {
+    if (!confirm("Send evaluation emails to all registered students?")) return;
+    setSendingEvals(true);
+    const res = await fetch(`/api/admin/classes/${id}/send-evals`, { method: "POST" });
+    const d = await res.json().catch(() => null);
+    alert(res.ok ? `Sent ${d.sent} email(s).${d.skipped ? ` ${d.skipped} failed.` : ""}` : `Failed: ${d?.error ?? res.statusText}`);
+    setSendingEvals(false);
     load();
   };
 
@@ -224,6 +237,14 @@ export default function AdminClassDetailPage() {
           >
             <BadgeCheck className="w-4 h-4" />
             {completing ? "Saving…" : data.is_completed ? "Completed ✓" : "Mark Complete"}
+          </button>
+          <button
+            onClick={sendEvals}
+            disabled={sendingEvals}
+            className="inline-flex items-center gap-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 px-3 py-2 rounded-lg transition-colors"
+          >
+            <Mail className="w-4 h-4" />
+            {sendingEvals ? "Sending…" : "Send Evaluations"}
           </button>
           <button
             onClick={downloadForms}

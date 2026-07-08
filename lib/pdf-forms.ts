@@ -472,18 +472,66 @@ export async function fillExamSheet(
 
 // ─── Course Evaluation (flat PDF — coordinate overlay) ────────────────────────
 
+import type { Evaluation } from "./types";
+
+// Maps an answer value to an X mark drawn at the given coordinate
+// Coordinates tuned to the AHA BLS Classroom Course Evaluation layout
+const EVAL_MARKS: Record<string, Record<string, [number, number]>> = {
+  inst_q1:    { yes: [109, 631], no: [109, 620] },
+  inst_q2:    { yes: [109, 600], no: [109, 589] },
+  inst_q3:    { yes: [109, 569], no: [109, 558] },
+  content_q1: { yes: [109, 516], no: [109, 505] },
+  content_q2: { too_hard: [109, 488], too_easy: [109, 477], appropriate: [109, 466] },
+  content_q3: { yes: [109, 448], no: [109, 437] },
+  content_q4: { excellent: [109, 418], good: [109, 407], fair: [109, 396], poor: [109, 385] },
+  content_q5: { yes: [109, 366], no: [109, 355] },
+  skill_q1:   { yes: [109, 304], no: [109, 293] },
+  skill_q2:   { yes: [109, 274], no: [109, 263], not_sure: [109, 252] },
+  skill_q3:   { yes: [370, 631], no: [370, 620], not_sure: [370, 609] },
+  skill_q4:   { yes: [370, 584], no: [370, 573] },
+};
+
 export async function fillCourseEvaluation(
   reg: Registration,
   cls: CPRClass,
-  templateBytes: Uint8Array
+  templateBytes: Uint8Array,
+  eval_: Evaluation | null = null
 ): Promise<Uint8Array> {
   const doc  = await PDFDocument.load(templateBytes);
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const page = doc.getPages()[0];
+  const black = rgb(0, 0, 0);
 
-  page.drawText(fmtDate(cls.class_date), {
-    font, size: 11, color: rgb(0, 0, 0), x: 52, y: 712,
-  });
+  // Date header
+  page.drawText(fmtDate(cls.class_date), { font, size: 10, color: black, x: 52, y: 712 });
+
+  if (eval_) {
+    // Draw X marks for each answered question
+    for (const [field, coords] of Object.entries(EVAL_MARKS)) {
+      const answer = eval_[field as keyof Evaluation] as string | null;
+      if (answer && coords[answer]) {
+        const [x, y] = coords[answer];
+        page.drawText("X", { font, size: 10, color: black, x, y });
+      }
+    }
+
+    // Open-ended comments (up to 4 lines each, 45 chars wide)
+    const drawComment = (text: string, startX: number, startY: number, lineH = 11) => {
+      const words = text.split(" ");
+      let line = ""; let y = startY;
+      for (const w of words) {
+        if ((line + " " + w).trim().length > 46) {
+          page.drawText(line.trim(), { font, size: 8, color: black, x: startX, y });
+          y -= lineH; line = w;
+        } else { line = (line + " " + w).trim(); }
+      }
+      if (line) page.drawText(line.trim(), { font, size: 8, color: black, x: startX, y });
+    };
+
+    if (eval_.comment_learning)  drawComment(eval_.comment_learning,  370, 540);
+    if (eval_.comment_strengths) drawComment(eval_.comment_strengths, 370, 468);
+    if (eval_.comment_future)    drawComment(eval_.comment_future,    370, 398);
+  }
 
   return doc.save();
 }

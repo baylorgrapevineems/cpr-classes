@@ -43,7 +43,22 @@ export async function initDb() {
       card_number TEXT,
       card_issued_at DATE,
       card_expires_at DATE,
-      notes TEXT
+      notes TEXT,
+      eval_token TEXT UNIQUE,
+      eval_sent_at TIMESTAMPTZ
     )
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS evaluations (
+      id SERIAL PRIMARY KEY,
+      registration_id INTEGER NOT NULL UNIQUE REFERENCES registrations(id) ON DELETE CASCADE,
+      submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      inst_q1 TEXT, inst_q2 TEXT, inst_q3 TEXT,
+      content_q1 TEXT, content_q2 TEXT, content_q3 TEXT, content_q4 TEXT, content_q5 TEXT,
+      skill_q1 TEXT, skill_q2 TEXT, skill_q3 TEXT, skill_q4 TEXT,
+      comment_learning TEXT, comment_strengths TEXT, comment_future TEXT
+    )
+  `;
+  await sql`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS eval_token TEXT UNIQUE`;
+  await sql`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS eval_sent_at TIMESTAMPTZ`;
 }

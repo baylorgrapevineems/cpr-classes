@@ -9,7 +9,7 @@ import {
   makeAdultSkillsChecklist,
   makeInfantSkillsChecklist,
 } from "@/lib/pdf-forms";
-import type { CPRClass, Registration } from "@/lib/types";
+import type { CPRClass, Registration, Evaluation } from "@/lib/types";
 
 export const maxDuration = 60;
 
@@ -29,17 +29,20 @@ export async function GET(
   const classId = parseInt(id);
   const sql = getDb();
 
-  const [classRows, regRows] = await Promise.all([
+  const [classRows, regRows, evalRows] = await Promise.all([
     sql`SELECT * FROM classes WHERE id = ${classId}`,
     sql`SELECT * FROM registrations WHERE class_id = ${classId} ORDER BY registered_at`,
+    sql`SELECT e.* FROM evaluations e JOIN registrations r ON r.id = e.registration_id WHERE r.class_id = ${classId}`,
   ]);
 
   if (!classRows[0]) {
     return NextResponse.json({ error: "Class not found" }, { status: 404 });
   }
 
-  const cls  = classRows[0] as CPRClass;
-  const regs = regRows as Registration[];
+  const cls   = classRows[0] as CPRClass;
+  const regs  = regRows as Registration[];
+  const evals = evalRows as Evaluation[];
+  const evalByRegId = Object.fromEntries(evals.map(e => [e.registration_id, e]));
 
   try {
     const base = req.nextUrl.origin;
@@ -62,9 +65,10 @@ export async function GET(
     await Promise.all(regs.map(async (reg) => {
       const slug   = `${reg.first_name}_${reg.last_name}`.replace(/[^a-zA-Z0-9_]/g, "_");
       const folder = perStudent.folder(slug)!;
+      const evalData = evalByRegId[reg.id] ?? null;
       const [exam, eval_, adultChecklist, infantChecklist] = await Promise.all([
         fillExamSheet(reg, cls, examBytes),
-        fillCourseEvaluation(reg, cls, evalBytes),
+        fillCourseEvaluation(reg, cls, evalBytes, evalData),
         makeAdultSkillsChecklist(reg, cls),
         makeInfantSkillsChecklist(reg, cls),
       ]);
