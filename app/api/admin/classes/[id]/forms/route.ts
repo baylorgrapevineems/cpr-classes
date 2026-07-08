@@ -6,10 +6,11 @@ import {
   fillCourseRoster,
   fillExamSheet,
   fillCourseEvaluation,
+  fillQuizResults,
   makeAdultSkillsChecklist,
   makeInfantSkillsChecklist,
 } from "@/lib/pdf-forms";
-import type { CPRClass, Registration, Evaluation } from "@/lib/types";
+import type { CPRClass, Registration, Evaluation, QuizResult } from "@/lib/types";
 
 export const maxDuration = 60;
 
@@ -29,10 +30,11 @@ export async function GET(
   const classId = parseInt(id);
   const sql = getDb();
 
-  const [classRows, regRows, evalRows] = await Promise.all([
+  const [classRows, regRows, evalRows, quizRows] = await Promise.all([
     sql`SELECT * FROM classes WHERE id = ${classId}`,
     sql`SELECT * FROM registrations WHERE class_id = ${classId} ORDER BY registered_at`,
     sql`SELECT e.* FROM evaluations e JOIN registrations r ON r.id = e.registration_id WHERE r.class_id = ${classId}`,
+    sql`SELECT qr.* FROM quiz_results qr JOIN registrations r ON r.id = qr.registration_id WHERE r.class_id = ${classId}`,
   ]);
 
   if (!classRows[0]) {
@@ -42,7 +44,9 @@ export async function GET(
   const cls   = classRows[0] as CPRClass;
   const regs  = regRows as Registration[];
   const evals = evalRows as Evaluation[];
-  const evalByRegId = Object.fromEntries(evals.map(e => [e.registration_id, e]));
+  const quizzes = quizRows as QuizResult[];
+  const evalByRegId  = Object.fromEntries(evals.map(e => [e.registration_id, e]));
+  const quizByRegId  = Object.fromEntries(quizzes.map(q => [q.registration_id, q]));
 
   try {
     const base = req.nextUrl.origin;
@@ -65,6 +69,7 @@ export async function GET(
       const slug   = `${reg.first_name}_${reg.last_name}`.replace(/[^a-zA-Z0-9_]/g, "_");
       const folder = perStudent.folder(slug)!;
       const evalData = evalByRegId[reg.id] ?? null;
+      const quizData = quizByRegId[reg.id] ?? null;
       const [exam, eval_, adultChecklist, infantChecklist] = await Promise.all([
         fillExamSheet(reg, cls, examBytes),
         fillCourseEvaluation(reg, cls, evalData),
@@ -75,6 +80,15 @@ export async function GET(
       folder.file("Course-Evaluation.pdf",              eval_);
       folder.file("Adult-CPR-AED-Skills-Checklist.pdf", adultChecklist);
       folder.file("Infant-CPR-Skills-Checklist.pdf",    infantChecklist);
+      if (quizData?.passed) {
+        const quizPdf = await fillQuizResults(reg, cls, {
+          version: quizData.version,
+          answers: quizData.answers as Record<string, string>,
+          score:   Number(quizData.score),
+          passed:  Boolean(quizData.passed),
+        });
+        folder.file("Written-Exam-Results.pdf", quizPdf);
+      }
     }));
 
     const buf      = await zip.generateAsync({ type: "nodebuffer" });

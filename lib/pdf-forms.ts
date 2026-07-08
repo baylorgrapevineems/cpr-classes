@@ -698,6 +698,166 @@ export async function fillCourseEvaluation(
   return doc.save();
 }
 
+// ─── Completed Quiz Results PDF ───────────────────────────────────────────────
+
+import { EXAMS } from "./exam";
+
+export async function fillQuizResults(
+  reg: Registration,
+  cls: CPRClass,
+  quizResult: { version: string; answers: Record<string, string>; score: number; passed: boolean }
+): Promise<Uint8Array> {
+  const exam = EXAMS[(quizResult.version as "C" | "D")] ?? EXAMS["C"];
+
+  const doc    = await PDFDocument.create();
+  const font   = await doc.embedFont(StandardFonts.Helvetica);
+  const bold   = await doc.embedFont(StandardFonts.HelveticaBold);
+  const italic = await doc.embedFont(StandardFonts.HelveticaOblique);
+
+  const red    = rgb(0.784, 0.063, 0.18);
+  const black  = rgb(0, 0, 0);
+  const dgray  = rgb(0.35, 0.35, 0.35);
+  const lgray  = rgb(0.94, 0.94, 0.94);
+  const white  = rgb(1, 1, 1);
+  const green  = rgb(0.09, 0.50, 0.24);
+
+  const PW = 612, PH = 792;
+  const ML = 40, MR = 572, CW = MR - ML;
+  const BOTTOM = 52;
+
+  let page = doc.addPage([PW, PH]);
+  let y = PH - 36;
+
+  const t = (text: string, x: number, yy: number, size: number, f = font, c = black) =>
+    page.drawText(text, { font: f, size, color: c, x, y: yy, maxWidth: MR - x });
+
+  // Pixel-accurate text wrap
+  const wrap = (text: string, maxW: number, size: number, f = font): string[] => {
+    const words = text.split(" ");
+    const lines: string[] = [];
+    let line = "";
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (f.widthOfTextAtSize(test, size) > maxW && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
+    return lines.length ? lines : [""];
+  };
+
+  const addPage = (isContinuation: boolean) => {
+    page = doc.addPage([PW, PH]);
+    y = PH - 36;
+    if (isContinuation) {
+      page.drawRectangle({ x: ML, y: y - 16, width: CW, height: 20, color: red });
+      t("BLS Written Examination — Completed (continued)", ML + 6, y - 11, 8, bold, white);
+      y -= 26;
+    }
+  };
+
+  const ensureSpace = (needed: number) => {
+    if (y - needed < BOTTOM) addPage(true);
+  };
+
+  // ── Page 1 header ──────────────────────────────────────────────────────────
+  page.drawRectangle({ x: ML, y: y - 36, width: CW, height: 40, color: red });
+  t("BLS Written Examination — Completed", ML + 8, y - 14, 13, bold, white);
+  t("American Heart Association · Basic Life Support", ML + 8, y - 28, 8, font, rgb(1, 0.78, 0.78));
+  y -= 46;
+
+  // Student info bar
+  page.drawRectangle({ x: ML, y: y - 32, width: CW, height: 36, color: lgray });
+  const dateStr = fmtDate(cls.class_date);
+  t(`${reg.first_name} ${reg.last_name}`, ML + 8, y - 12, 9, bold);
+  t(`Class: ${cls.title}`, ML + 8, y - 26, 8);
+  t(`Date: ${dateStr}`, ML + 290, y - 12, 8);
+  t(`Exam: Version ${quizResult.version}`, ML + 290, y - 26, 8);
+  const scoreColor = quizResult.passed ? green : red;
+  t(`${quizResult.score}/25`, MR - 46, y - 12, 13, bold, scoreColor);
+  t(quizResult.passed ? "PASSED" : "FAILED", MR - 46, y - 27, 8, bold, scoreColor);
+  y -= 42;
+
+  page.drawLine({ start: { x: ML, y }, end: { x: MR, y }, thickness: 0.5, color: dgray });
+  y -= 10;
+
+  // ── Questions ──────────────────────────────────────────────────────────────
+  let prevScenario: string | null = null;
+
+  for (let i = 0; i < exam.questions.length; i++) {
+    const q       = exam.questions[i];
+    const qNum    = i + 1;
+    const picked  = quizResult.answers[String(qNum)] ?? null;
+
+    // Scenario block — only when scenario changes
+    if (q.scenario && q.scenario !== prevScenario) {
+      prevScenario = q.scenario;
+      const sLines = wrap(q.scenario, CW - 16, 7.5, italic);
+      const sH     = sLines.length * 11 + 14;
+      ensureSpace(sH + 6);
+      page.drawRectangle({ x: ML, y: y - sH, width: CW, height: sH, color: lgray });
+      t("SCENARIO", ML + 6, y - 9, 6, bold, dgray);
+      for (let l = 0; l < sLines.length; l++) {
+        page.drawText(sLines[l], { font: italic, size: 7.5, color: rgb(0.2, 0.2, 0.2), x: ML + 6, y: y - 19 - l * 11 });
+      }
+      y -= sH + 6;
+    }
+
+    // Pre-compute option lines to know total block height
+    const LETTERS = ["A", "B", "C", "D"] as const;
+    const optRows: { letter: string; lines: string[]; selected: boolean }[] = LETTERS.map((ltr) => ({
+      letter: ltr,
+      lines:  wrap(`${ltr}.  ${q.options[ltr]}`, CW - 22, 7.5),
+      selected: picked === ltr,
+    }));
+    const qLines  = wrap(`${qNum}.  ${q.text}`, CW - 4, 8, bold);
+    const qH      = qLines.length * 12 + 4;
+    const optsH   = optRows.reduce((s, o) => s + o.lines.length * 10 + 6, 0);
+    const blockH  = qH + optsH + 12;
+
+    ensureSpace(blockH);
+
+    // Question text
+    for (let l = 0; l < qLines.length; l++) {
+      page.drawText(qLines[l], { font: bold, size: 8, color: black, x: ML, y: y - l * 12 });
+    }
+    y -= qH + 2;
+
+    // Options
+    for (const opt of optRows) {
+      const rowH = opt.lines.length * 10 + 6;
+      if (opt.selected) {
+        page.drawRectangle({ x: ML + 2, y: y - rowH + 2, width: CW - 4, height: rowH, color: rgb(1, 0.94, 0.94), borderColor: red, borderWidth: 0.75 });
+      }
+      for (let l = 0; l < opt.lines.length; l++) {
+        page.drawText(opt.lines[l], {
+          font: opt.selected ? bold : font,
+          size: 7.5,
+          color: opt.selected ? black : dgray,
+          x: ML + 10,
+          y: y - 3 - l * 10,
+        });
+      }
+      y -= rowH;
+    }
+    y -= 12;
+  }
+
+  // ── Score footer ───────────────────────────────────────────────────────────
+  ensureSpace(30);
+  page.drawLine({ start: { x: ML, y: y - 4 }, end: { x: MR, y: y - 4 }, thickness: 0.5, color: dgray });
+  y -= 18;
+  t(
+    `Final Score: ${quizResult.score} / 25  (${Math.round((quizResult.score / 25) * 100)}%)  —  ${quizResult.passed ? "PASSED" : "NOT PASSED"}`,
+    ML, y, 9, bold, scoreColor
+  );
+
+  return doc.save();
+}
+
 // ─── Per-student skills label ─────────────────────────────────────────────────
 
 export async function makeSkillsLabel(
