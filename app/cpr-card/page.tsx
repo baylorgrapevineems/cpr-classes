@@ -6,7 +6,7 @@ import { Heart, ArrowLeft } from "lucide-react";
 
 export default function CprCardPage() {
   const [form, setForm] = useState({
-    first_name: "", last_name: "", email: "", phone: "", notes: "",
+    first_name: "", last_name: "", email: "", phone: "", address: "", notes: "",
   });
   const [status, setStatus] = useState<"idle" | "submitting" | "done" | "error">("idle");
   const [errMsg, setErrMsg] = useState("");
@@ -116,6 +116,16 @@ export default function CprCardPage() {
                 type="tel"
                 value={form.phone}
                 onChange={e => set("phone", e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Address</label>
+              <input
+                value={form.address}
+                onChange={e => set("address", e.target.value)}
+                placeholder="Street, City, State, ZIP"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
               />
             </div>

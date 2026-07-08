@@ -82,9 +82,11 @@ export async function initDb() {
       last_name TEXT NOT NULL,
       email TEXT NOT NULL,
       phone TEXT,
+      address TEXT,
       notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL
-    )
+    )`
+  await sql`ALTER TABLE card_requests ADD COLUMN IF NOT EXISTS address TEXT
   `;
 }

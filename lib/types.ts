@@ -75,6 +75,7 @@ export interface CardRequest {
   last_name: string;
   email: string;
   phone: string | null;
+  address: string | null;
   notes: string | null;
   created_at: string;
   class_id: number | null;
