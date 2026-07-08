@@ -30,25 +30,24 @@ export async function GET(
   const classId = parseInt(id);
   const sql = getDb();
 
-  const [classRows, regRows, evalRows, quizRows] = await Promise.all([
-    sql`SELECT * FROM classes WHERE id = ${classId}`,
-    sql`SELECT * FROM registrations WHERE class_id = ${classId} ORDER BY registered_at`,
-    sql`SELECT e.* FROM evaluations e JOIN registrations r ON r.id = e.registration_id WHERE r.class_id = ${classId}`,
-    sql`SELECT qr.* FROM quiz_results qr JOIN registrations r ON r.id = qr.registration_id WHERE r.class_id = ${classId}`,
-  ]);
-
-  if (!classRows[0]) {
-    return NextResponse.json({ error: "Class not found" }, { status: 404 });
-  }
-
-  const cls   = classRows[0] as CPRClass;
-  const regs  = regRows as Registration[];
-  const evals = evalRows as Evaluation[];
-  const quizzes = quizRows as QuizResult[];
-  const evalByRegId  = Object.fromEntries(evals.map(e => [e.registration_id, e]));
-  const quizByRegId  = Object.fromEntries(quizzes.map(q => [q.registration_id, q]));
-
   try {
+    const [classRows, regRows, evalRows, quizRows] = await Promise.all([
+      sql`SELECT * FROM classes WHERE id = ${classId}`,
+      sql`SELECT * FROM registrations WHERE class_id = ${classId} ORDER BY registered_at`,
+      sql`SELECT e.* FROM evaluations e JOIN registrations r ON r.id = e.registration_id WHERE r.class_id = ${classId}`,
+      sql`SELECT qr.* FROM quiz_results qr JOIN registrations r ON r.id = qr.registration_id WHERE r.class_id = ${classId}`.catch(() => []),
+    ]);
+
+    if (!classRows[0]) {
+      return NextResponse.json({ error: "Class not found" }, { status: 404 });
+    }
+
+    const cls     = classRows[0] as CPRClass;
+    const regs    = regRows as Registration[];
+    const evals   = evalRows as Evaluation[];
+    const quizzes = quizRows as QuizResult[];
+    const evalByRegId = Object.fromEntries(evals.map(e => [e.registration_id, e]));
+    const quizByRegId = Object.fromEntries(quizzes.map(q => [q.registration_id, q]));
     const base = req.nextUrl.origin;
 
     // Fetch templates in parallel (skills checklist and eval built from scratch)

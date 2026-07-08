@@ -13,43 +13,46 @@ export async function GET(
   { params }: Ctx
 ) {
   const { token } = await params;
-  const sql = getDb();
+  try {
+    const sql = getDb();
 
-  const rows = await sql`
-    SELECT r.id, r.first_name, r.last_name, r.quiz_version,
-           c.title, c.class_date,
-           qr.id AS result_id, qr.score, qr.passed
-    FROM registrations r
-    JOIN classes c ON c.id = r.class_id
-    LEFT JOIN quiz_results qr ON qr.registration_id = r.id
-    WHERE r.quiz_token = ${token}
-    LIMIT 1
-  `;
+    const rows = await sql`
+      SELECT r.id, r.first_name, r.last_name, r.quiz_version,
+             c.title, c.class_date,
+             qr.id AS result_id, qr.score, qr.passed
+      FROM registrations r
+      JOIN classes c ON c.id = r.class_id
+      LEFT JOIN quiz_results qr ON qr.registration_id = r.id
+      WHERE r.quiz_token = ${token}
+      LIMIT 1
+    `;
 
-  if (!rows[0]) return NextResponse.json({ error: "Invalid link" }, { status: 404 });
+    if (!rows[0]) return NextResponse.json({ error: "Invalid link" }, { status: 404 });
 
-  const row = rows[0];
-  const version = (row.quiz_version as "C" | "D") ?? "C";
-  const exam = EXAMS[version];
+    const row = rows[0];
+    const version = (row.quiz_version as "C" | "D") ?? "C";
+    const exam = EXAMS[version];
 
-  // Strip answers — never send to client
-  const questions = exam.questions.map((q, i) => ({
-    number: i + 1,
-    scenario: q.scenario ?? null,
-    text: q.text,
-    options: q.options,
-  }));
+    const questions = exam.questions.map((q, i) => ({
+      number: i + 1,
+      scenario: q.scenario ?? null,
+      text: q.text,
+      options: q.options,
+    }));
 
-  return NextResponse.json({
-    firstName: String(row.first_name),
-    lastName: String(row.last_name),
-    classTitle: String(row.title),
-    classDate: String(row.class_date),
-    questions,
-    alreadySubmitted: row.result_id != null,
-    score: row.score != null ? Number(row.score) : null,
-    passed: row.passed != null ? Boolean(row.passed) : null,
-  });
+    return NextResponse.json({
+      firstName: String(row.first_name),
+      lastName: String(row.last_name),
+      classTitle: String(row.title),
+      classDate: String(row.class_date),
+      questions,
+      alreadySubmitted: row.result_id != null,
+      score: row.score != null ? Number(row.score) : null,
+      passed: row.passed != null ? Boolean(row.passed) : null,
+    });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
 }
 
 export async function POST(
@@ -57,6 +60,7 @@ export async function POST(
   { params }: Ctx
 ) {
   const { token } = await params;
+  try {
   const sql = getDb();
 
   const rows = await sql`
@@ -129,4 +133,7 @@ export async function POST(
   }
 
   return NextResponse.json({ score: correct, passed, total: 25 });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
 }

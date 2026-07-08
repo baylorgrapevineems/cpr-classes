@@ -35,7 +35,6 @@ export default function QuizPage() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
-  const [retaking, setRetaking] = useState(false);
 
   const loadQuiz = () => {
     setLoading(true);
@@ -86,10 +85,7 @@ export default function QuizPage() {
   const startRetake = () => {
     setResult(null);
     setAnswers({});
-    setRetaking(true);
-    // Reset on the data side so the form shows fresh
     if (data) setData({ ...data, alreadySubmitted: false, score: null, passed: null });
-    setRetaking(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -172,7 +168,6 @@ export default function QuizPage() {
             {!result.passed && (
               <button
                 onClick={startRetake}
-                disabled={retaking}
                 style={{
                   background: "#c8102e", color: "#fff", border: "none",
                   padding: "10px 28px", borderRadius: 6, fontWeight: 700,
