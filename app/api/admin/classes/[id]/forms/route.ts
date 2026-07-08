@@ -6,7 +6,7 @@ import {
   fillCourseRoster,
   fillExamSheet,
   fillCourseEvaluation,
-  makeSkillsLabel,
+  makeAdultSkillsChecklist,
 } from "@/lib/pdf-forms";
 import type { CPRClass, Registration } from "@/lib/types";
 
@@ -43,13 +43,12 @@ export async function GET(
   try {
     const base = req.nextUrl.origin;
 
-    // Fetch all 5 templates in parallel — one round-trip total
-    const [rosterBytes, examBytes, evalBytes, adultBytes, infantBytes] =
+    // Fetch templates in parallel (adult skills checklist built from scratch — no template needed)
+    const [rosterBytes, examBytes, evalBytes, infantBytes] =
       await Promise.all([
         fetchTemplate(base, "2020-Guidelines-BLS-Course-Roster_ucm_506772.pdf"),
         fetchTemplate(base, "EXAM SHEET.pdf"),
         fetchTemplate(base, "2020-BLS-Classroom-Course-Evaluation_ucm_506774.pdf"),
-        fetchTemplate(base, "Adult-CPR-and-AED-Skills-Testing-Checklist_ucm_506673.pdf"),
         fetchTemplate(base, "Infant-CPR-Skills-Testing-Checklist_ucm_506675.pdf"),
       ]);
 
@@ -58,23 +57,22 @@ export async function GET(
     // Course roster (one for the class)
     zip.file("BLS-Course-Roster.pdf", await fillCourseRoster(cls, regs, rosterBytes));
 
-    // Blank AHA skills checklists (encrypted — included as-is)
-    zip.file("Skills-Checklists/Adult-CPR-AED-Skills-Checklist-BLANK.pdf", adultBytes);
-    zip.file("Skills-Checklists/Infant-CPR-Skills-Checklist-BLANK.pdf",    infantBytes);
+    // Blank infant checklist (still encrypted — included as-is until rebuilt)
+    zip.file("Skills-Checklists/Infant-CPR-Skills-Checklist-BLANK.pdf", infantBytes);
 
     // Per-student forms (all students in parallel)
     const perStudent = zip.folder("Per-Student")!;
     await Promise.all(regs.map(async (reg) => {
       const slug   = `${reg.first_name}_${reg.last_name}`.replace(/[^a-zA-Z0-9_]/g, "_");
       const folder = perStudent.folder(slug)!;
-      const [exam, eval_, label] = await Promise.all([
+      const [exam, eval_, checklist] = await Promise.all([
         fillExamSheet(reg, cls, examBytes),
         fillCourseEvaluation(reg, cls, evalBytes),
-        makeSkillsLabel(reg, cls),
+        makeAdultSkillsChecklist(reg, cls),
       ]);
-      folder.file("Exam-Sheet.pdf",        exam);
-      folder.file("Course-Evaluation.pdf", eval_);
-      folder.file("Skills-Label.pdf",      label);
+      folder.file("Exam-Sheet.pdf",                    exam);
+      folder.file("Course-Evaluation.pdf",             eval_);
+      folder.file("Adult-CPR-AED-Skills-Checklist.pdf", checklist);
     }));
 
     const buf      = await zip.generateAsync({ type: "nodebuffer" });
