@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { EXAMS } from "@/lib/exam";
+import { sendEvalEmail } from "@/lib/email";
+import { randomBytes } from "crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -58,8 +60,12 @@ export async function POST(
   const sql = getDb();
 
   const rows = await sql`
-    SELECT r.id, r.quiz_version, qr.id AS result_id, qr.passed AS prev_passed
+    SELECT r.id, r.first_name, r.email, r.quiz_version,
+           r.eval_token, r.eval_sent_at,
+           c.title, c.class_date,
+           qr.id AS result_id, qr.passed AS prev_passed
     FROM registrations r
+    JOIN classes c ON c.id = r.class_id
     LEFT JOIN quiz_results qr ON qr.registration_id = r.id
     WHERE r.quiz_token = ${token}
     LIMIT 1
@@ -94,6 +100,33 @@ export async function POST(
     INSERT INTO quiz_results (registration_id, version, answers, score, passed)
     VALUES (${Number(regId)}, ${version}, ${JSON.stringify(answers)}, ${correct}, ${passed})
   `;
+
+  // Auto-send eval email when student passes for the first time
+  if (passed && !rows[0].eval_sent_at) {
+    try {
+      let evalToken = rows[0].eval_token as string | null;
+      if (!evalToken) {
+        evalToken = randomBytes(24).toString("hex");
+        await sql`UPDATE registrations SET eval_token = ${evalToken} WHERE id = ${Number(regId)}`;
+      }
+      await sql`UPDATE registrations SET eval_sent_at = NOW() WHERE id = ${Number(regId)}`;
+
+      const baseUrl = req.headers.get("origin") ?? "https://cpr.baylorgrapevineems.com";
+      const classDate = new Date(rows[0].class_date).toLocaleDateString("en-US", {
+        month: "long", day: "numeric", year: "numeric",
+      });
+      await sendEvalEmail({
+        to:         String(rows[0].email),
+        firstName:  String(rows[0].first_name),
+        classTitle: String(rows[0].title),
+        classDate,
+        token:      evalToken,
+        baseUrl,
+      });
+    } catch {
+      // Don't fail the submission if email errors
+    }
+  }
 
   return NextResponse.json({ score: correct, passed, total: 25 });
 }
