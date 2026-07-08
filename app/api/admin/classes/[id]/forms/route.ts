@@ -7,6 +7,7 @@ import {
   fillExamSheet,
   fillCourseEvaluation,
   makeAdultSkillsChecklist,
+  makeInfantSkillsChecklist,
 } from "@/lib/pdf-forms";
 import type { CPRClass, Registration } from "@/lib/types";
 
@@ -43,13 +44,12 @@ export async function GET(
   try {
     const base = req.nextUrl.origin;
 
-    // Fetch templates in parallel (adult skills checklist built from scratch — no template needed)
-    const [rosterBytes, examBytes, evalBytes, infantBytes] =
+    // Fetch templates in parallel (skills checklists built from scratch — no templates needed)
+    const [rosterBytes, examBytes, evalBytes] =
       await Promise.all([
         fetchTemplate(base, "2020-Guidelines-BLS-Course-Roster_ucm_506772.pdf"),
         fetchTemplate(base, "EXAM SHEET.pdf"),
         fetchTemplate(base, "2020-BLS-Classroom-Course-Evaluation_ucm_506774.pdf"),
-        fetchTemplate(base, "Infant-CPR-Skills-Testing-Checklist_ucm_506675.pdf"),
       ]);
 
     const zip = new JSZip();
@@ -57,22 +57,21 @@ export async function GET(
     // Course roster (one for the class)
     zip.file("BLS-Course-Roster.pdf", await fillCourseRoster(cls, regs, rosterBytes));
 
-    // Blank infant checklist (still encrypted — included as-is until rebuilt)
-    zip.file("Skills-Checklists/Infant-CPR-Skills-Checklist-BLANK.pdf", infantBytes);
-
     // Per-student forms (all students in parallel)
     const perStudent = zip.folder("Per-Student")!;
     await Promise.all(regs.map(async (reg) => {
       const slug   = `${reg.first_name}_${reg.last_name}`.replace(/[^a-zA-Z0-9_]/g, "_");
       const folder = perStudent.folder(slug)!;
-      const [exam, eval_, checklist] = await Promise.all([
+      const [exam, eval_, adultChecklist, infantChecklist] = await Promise.all([
         fillExamSheet(reg, cls, examBytes),
         fillCourseEvaluation(reg, cls, evalBytes),
         makeAdultSkillsChecklist(reg, cls),
+        makeInfantSkillsChecklist(reg, cls),
       ]);
-      folder.file("Exam-Sheet.pdf",                    exam);
-      folder.file("Course-Evaluation.pdf",             eval_);
-      folder.file("Adult-CPR-AED-Skills-Checklist.pdf", checklist);
+      folder.file("Exam-Sheet.pdf",                     exam);
+      folder.file("Course-Evaluation.pdf",              eval_);
+      folder.file("Adult-CPR-AED-Skills-Checklist.pdf", adultChecklist);
+      folder.file("Infant-CPR-Skills-Checklist.pdf",    infantChecklist);
     }));
 
     const buf      = await zip.generateAsync({ type: "nodebuffer" });

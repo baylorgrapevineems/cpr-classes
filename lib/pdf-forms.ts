@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, PDFPage, rgb, StandardFonts } from "pdf-lib";
 import type { CPRClass, Registration } from "./types";
 
 // ─── Adult CPR and AED Skills Testing Checklist (built from scratch) ──────────
@@ -192,6 +192,204 @@ function fmtTime(val: unknown): string {
 function cardExpiry(val: unknown): string {
   const [y, m, d] = toIso(val).slice(0, 10).split("-");
   return `${m}/${d}/${Number(y) + 2}`;
+}
+
+// ─── Infant CPR Skills Testing Checklist (2-page, built from scratch) ─────────
+
+export async function makeInfantSkillsChecklist(
+  reg: Registration,
+  cls: CPRClass
+): Promise<Uint8Array> {
+  const doc    = await PDFDocument.create();
+  const font   = await doc.embedFont(StandardFonts.Helvetica);
+  const bold   = await doc.embedFont(StandardFonts.HelveticaBold);
+  const italic = await doc.embedFont(StandardFonts.HelveticaOblique);
+
+  const L = 36, R = 576, CW = 540;
+  const navy  = rgb(0.13, 0.29, 0.53);
+  const lblue = rgb(0.85, 0.91, 0.97);
+  const black = rgb(0, 0, 0);
+  const gray  = rgb(0.45, 0.45, 0.45);
+  const lgray = rgb(0.93, 0.93, 0.93);
+  const white = rgb(1, 1, 1);
+
+  const passed = reg.passed;
+  const allCb  = passed === true;
+  const name   = `${reg.first_name} ${reg.last_name}`;
+  const date   = fmtDate(cls.class_date);
+
+  // Per-page drawing helpers
+  function bind(p: PDFPage) {
+    const t = (s: string, x: number, y: number, sz: number, f = font, c = black) =>
+      p.drawText(s, { font: f, size: sz, color: c, x, y });
+    const cb = (x: number, y: number, checked: boolean) => {
+      p.drawRectangle({ x, y, width: 7, height: 7, color: white, borderColor: black, borderWidth: 0.75 });
+      if (checked) {
+        p.drawLine({ start: { x: x+1, y: y+1 }, end: { x: x+6, y: y+6 }, thickness: 1.2, color: black });
+        p.drawLine({ start: { x: x+6, y: y+1 }, end: { x: x+1, y: y+6 }, thickness: 1.2, color: black });
+      }
+    };
+    // White bg + light-blue header strip + navy border
+    const section = (y: number, h: number) => {
+      p.drawRectangle({ x: L, y, width: CW, height: h, color: white });
+      p.drawRectangle({ x: L+1, y: y+h-13, width: CW-2, height: 12, color: lblue });
+      p.drawRectangle({ x: L, y, width: CW, height: h, borderColor: navy, borderWidth: 1 });
+    };
+    // Full light-blue fill + navy border (Cycles 3 & 4)
+    const sectionFull = (y: number, h: number) => {
+      p.drawRectangle({ x: L, y, width: CW, height: h, color: lblue });
+      p.drawRectangle({ x: L, y, width: CW, height: h, borderColor: navy, borderWidth: 1 });
+    };
+    return { t, cb, section, sectionFull };
+  }
+
+  // Shared title + student name block
+  function pageHeader(p: PDFPage, label: string) {
+    const { t } = bind(p);
+    t("Basic Life Support", L, 762, 8, font, navy);
+    t("Infant CPR", L, 748, 14, bold, navy);
+    t("Skills Testing Checklist ", L, 732, 14, bold, navy);
+    t(`(${label})`, L+192, 732, 14, font, navy);
+    t("American Heart", 472, 752, 7.5, bold, navy);
+    t("Association.", 472, 741, 7.5, bold, navy);
+    p.drawLine({ start: { x: L, y: 722 }, end: { x: R, y: 722 }, thickness: 0.5, color: navy });
+    t("Student Name", L, 710, 8.5);
+    p.drawLine({ start: { x: L+66, y: 709 }, end: { x: 330, y: 709 }, thickness: 0.5, color: black });
+    t(name, L+68, 710, 8.5);
+    t("Date of Test", 345, 710, 8.5);
+    p.drawLine({ start: { x: 345+55, y: 709 }, end: { x: R, y: 709 }, thickness: 0.5, color: black });
+    t(date, 402, 710, 8.5);
+  }
+
+  // ─── PAGE 1 ───────────────────────────────────────────────────────────────
+  const p1 = doc.addPage([612, 792]);
+  pageHeader(p1, "1 of 2");
+  const { t: t1, cb: cb1, section: sect1, sectionFull: sectF1 } = bind(p1);
+
+  // Scenarios (5 lines at 7pt)
+  const sc = 7;
+  t1('Hospital Scenario: "You are working in a hospital or clinic when a woman runs through the door, carrying an infant. She', L, 698, sc);
+  t1("shouts, 'Help me! My baby's not breathing.' You have gloves and a pocket mask. You send your coworker to activate the", L, 688, sc);
+  t1('emergency response system and to get the emergency equipment."', L, 678, sc);
+  t1('Prehospital Scenario: "You arrive on the scene for an infant who is not breathing. No bystander CPR has been provided.', L, 668, sc);
+  t1('You approach the scene and ensure that it is safe. Demonstrate what you would do next."', L, 658, sc);
+
+  // Assessment and Activation
+  sect1(596, 52);
+  t1("Assessment and Activation", L+4, 636, 8.5, bold, navy);
+  cb1(L+4, 621, allCb);
+  t1("Checks responsiveness", L+14, 623, 8);
+  cb1(L+200, 621, allCb);
+  t1("Shouts for help/Activates emergency response system", L+210, 623, 8);
+  cb1(L+4, 607, allCb);
+  t1("Checks breathing", L+14, 609, 8);
+  cb1(L+200, 607, allCb);
+  t1("Checks pulse", L+210, 609, 8);
+
+  t1('Once student shouts for help, instructor says, "Here\'s the barrier device."', L, 586, 7.5, italic, black);
+
+  // Cycle 1 of CPR
+  sect1(424, 152);
+  t1("Cycle 1 of CPR (30:2)   ", L+4, 564, 8.5, bold, navy);
+  t1("*CPR feedback devices are preferred for accuracy", L+124, 564, 8, italic, navy);
+  t1("Infant Compressions", L+6, 550, 8.5, bold, black);
+  cb1(L+4, 535, allCb);
+  t1("Performs high-quality compressions*:", L+14, 537, 8);
+  t1("• Placement of 2 fingers or 2 thumbs in the center of the chest, just below the nipple line", L+18, 525, 7.5);
+  t1("• 30 compressions in no less than 15 and no more than 18 seconds", L+18, 514, 7.5);
+  t1("• Compresses at least one third the depth of the chest, approximately 1½ inches (4 cm)", L+18, 503, 7.5);
+  t1("• Complete recoil after each compression", L+18, 492, 7.5);
+  t1("Infant Breaths", L+6, 478, 8.5, bold, black);
+  cb1(L+4, 463, allCb);
+  t1("Gives 2 breaths with a barrier device:", L+14, 465, 8);
+  t1("• Each breath given over 1 second", L+18, 453, 7.5);
+  t1("• Visible chest rise with each breath", L+18, 442, 7.5);
+  t1("• Resumes compressions in less than 10 seconds", L+18, 431, 7.5);
+
+  // Cycle 2 of CPR
+  sect1(380, 38);
+  t1("Cycle 2 of CPR (repeats steps in Cycle 1)   ", L+4, 406, 8.5, bold, navy);
+  t1("Only check box if step is successfully performed", L+234, 406, 7.5, italic, navy);
+  cb1(L+4, 391, allCb);
+  t1("Compressions", L+14, 393, 8);
+  cb1(L+112, 391, allCb);
+  t1("Breaths", L+122, 393, 8);
+  cb1(L+178, 391, allCb);
+  t1("Resumes compressions in less than 10 seconds", L+188, 393, 8);
+
+  t1("Rescuer 2 arrives with bag-mask device and begins ventilation while Rescuer 1 continues compressions with 2 thumb–", L, 370, 7.5, italic, black);
+  t1("encircling hands technique.", L, 359, 7.5, italic, black);
+
+  // Cycle 3 of CPR (full blue — 2-rescuer section)
+  sectF1(237, 115);
+  t1("Cycle 3 of CPR", L+4, 340, 8.5, bold, navy);
+  t1("Rescuer 1: Infant Compressions", L+6, 326, 8.5, bold, black);
+  cb1(L+4, 311, allCb);
+  t1("Performs high-quality compressions*:", L+14, 313, 8);
+  t1("• 15 compressions with 2 thumb–encircling hands technique", L+18, 301, 7.5);
+  t1("• 15 compressions in no less than 7 and no more than 9 seconds", L+18, 290, 7.5);
+  t1("• Compresses at least one third the depth of the chest, approximately 1½ inches (4 cm)", L+18, 279, 7.5);
+  t1("• Complete recoil after each compression", L+18, 268, 7.5);
+  t1("Rescuer 2: Infant Breaths", L+6, 254, 8.5, bold, black);
+  t1("This rescuer is not evaluated.", L+6, 242, 7.5, italic, black);
+
+  t1("(continued)", L, 224, 8, italic, black);
+  t1("© 2020 American Heart Association", 612/2 - 82, 20, 7, font, gray);
+
+  // ─── PAGE 2 ───────────────────────────────────────────────────────────────
+  const p2 = doc.addPage([612, 792]);
+  pageHeader(p2, "2 of 2");
+  const { t: t2, cb: cb2, sectionFull: sectF2 } = bind(p2);
+
+  t2("(continued)", L, 696, 8, italic, black);
+
+  // Cycle 4 of CPR (full blue — 2-rescuer section)
+  sectF2(574, 106);
+  t2("Cycle 4 of CPR", L+4, 668, 8.5, bold, navy);
+  t2("Rescuer 2: Infant Compressions", L+6, 654, 8.5, bold, black);
+  t2("This rescuer is not evaluated.", L+6, 642, 7.5, italic, black);
+  t2("Rescuer 1: Infant Breaths", L+6, 628, 8.5, bold, black);
+  cb2(L+4, 613, allCb);
+  t2("Gives 2 breaths with a bag-mask device:", L+14, 615, 8);
+  t2("• Each breath given over 1 second", L+18, 603, 7.5);
+  t2("• Visible chest rise with each breath", L+18, 592, 7.5);
+  t2("• Resumes compressions in less than 10 seconds", L+18, 581, 7.5);
+
+  // STOP TEST
+  p2.drawLine({ start: { x: L, y: 568 }, end: { x: R, y: 568 }, thickness: 0.75, color: black });
+  t2("STOP TEST", 612/2 - 28, 556, 10, bold, black);
+  p2.drawLine({ start: { x: L, y: 550 }, end: { x: R, y: 550 }, thickness: 0.75, color: black });
+
+  // Instructor Notes
+  p2.drawRectangle({ x: L, y: 476, width: CW, height: 68, color: lgray, borderColor: gray, borderWidth: 0.75 });
+  t2("Instructor Notes", L+4, 532, 8.5, bold, black);
+  t2("• Place a check in the box next to each step the student completes successfully.", L+4, 520, 7.5);
+  t2("• If the student does not complete all steps successfully (as indicated by at least 1 blank check box), the student", L+4, 509, 7.5);
+  t2("  must receive remediation. Make a note here of which skills require remediation (refer to instructor manual for", L+4, 498, 7.5);
+  t2("  information about remediation).", L+4, 487, 7.5);
+
+  // Test Results
+  p2.drawRectangle({ x: L, y: 456, width: CW, height: 18, color: white, borderColor: black, borderWidth: 0.75 });
+  t2("Test Results", L+4, 461, 8.5, bold, black);
+  t2("Check PASS or NR to indicate pass or needs remediation:", L+76, 461, 8);
+  cb2(R-82, 457, passed === true);
+  t2("PASS", R-72, 461, 8.5, bold, black);
+  cb2(R-30, 457, passed === false);
+  t2("NR", R-20, 461, 8.5, bold, black);
+
+  // Instructor / Date
+  t2("Instructor Initials", L, 440, 8);
+  p2.drawLine({ start: { x: L+80, y: 439 }, end: { x: L+140, y: 439 }, thickness: 0.5, color: black });
+  t2("Instructor Number", L+150, 440, 8);
+  p2.drawLine({ start: { x: L+233, y: 439 }, end: { x: L+380, y: 439 }, thickness: 0.5, color: black });
+  if (cls.instructor_name) t2(cls.instructor_name, L+235, 440, 8);
+  t2("Date", L+390, 440, 8);
+  p2.drawLine({ start: { x: L+408, y: 439 }, end: { x: R, y: 439 }, thickness: 0.5, color: black });
+  t2(date, L+410, 440, 8);
+
+  t2("© 2020 American Heart Association", 612/2 - 82, 20, 7, font, gray);
+
+  return doc.save();
 }
 
 // ─── Course Roster (AcroForm) ─────────────────────────────────────────────────
