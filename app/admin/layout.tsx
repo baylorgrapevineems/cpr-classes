@@ -3,6 +3,8 @@ import { Heart } from "lucide-react";
 import SignOutButton from "@/components/sign-out-button";
 import { getDb } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 async function getPendingCardCount(): Promise<number> {
   try {
     const sql = getDb();
