@@ -397,7 +397,8 @@ export async function makeInfantSkillsChecklist(
 export async function fillCourseRoster(
   cls: CPRClass,
   regs: Registration[],
-  templateBytes: Uint8Array
+  templateBytes: Uint8Array,
+  signatureBytes?: Uint8Array
 ): Promise<Uint8Array> {
   const doc  = await PDFDocument.load(templateBytes);
   const form = doc.getForm();
@@ -409,8 +410,9 @@ export async function fillCourseRoster(
   const trainingCenter = process.env.PDF_TRAINING_CENTER ?? "Grapevine Fire Dept";
   const tcId           = process.env.PDF_TRAINING_CENTER_ID ?? "";
   const instructorId   = process.env.PDF_INSTRUCTOR_ID ?? "";
+  const instructorName = cls.instructor_name ?? process.env.PDF_LEAD_INSTRUCTOR ?? "";
 
-  set("Lead Instructor",       cls.instructor_name ?? "");
+  set("Lead Instructor",       instructorName);
   set("Lead Instructor ID#",   instructorId);
   set("Card Expriation Date",  cardExpiry(cls.class_date));
   set("Training Center",       trainingCenter);
@@ -443,7 +445,32 @@ export async function fillCourseRoster(
     set(`Complete-Incomplete${suffix}`, status);
   });
 
+  // Signature line lives only on page 1; capture its widget rect before
+  // flatten() removes the form fields, then draw the image on top afterward.
+  let sigRect: { x: number; y: number; width: number; height: number } | null = null;
+  if (signatureBytes) {
+    try {
+      const sigField = form.getTextField("Lead Instructor Signature");
+      sigRect = sigField.acroField.getWidgets()[0].getRectangle();
+    } catch {}
+  }
+
   form.flatten();
+
+  if (signatureBytes && sigRect) {
+    const sigImage = await doc.embedPng(signatureBytes);
+    const targetHeight = 30;
+    const scale = targetHeight / sigImage.height;
+    const drawWidth = sigImage.width * scale;
+    const page = doc.getPages()[0];
+    page.drawImage(sigImage, {
+      x: sigRect.x + 6,
+      y: sigRect.y - 4,
+      width: drawWidth,
+      height: targetHeight,
+    });
+  }
+
   return doc.save();
 }
 

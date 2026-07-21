@@ -51,16 +51,17 @@ export async function GET(
     const base = req.nextUrl.origin;
 
     // Fetch templates in parallel (skills checklist and eval built from scratch)
-    const [rosterBytes, examBytes] =
+    const [rosterBytes, examBytes, signatureBytes] =
       await Promise.all([
         fetchTemplate(base, "2025-Guidelines-BLS-Course-Roster.pdf"),
         fetchTemplate(base, "EXAM SHEET.pdf"),
+        fetchTemplate(base, "robert-baca-signature.png"),
       ]);
 
     const zip = new JSZip();
 
     // Course roster (one for the class)
-    zip.file("BLS-Course-Roster.pdf", await fillCourseRoster(cls, regs, rosterBytes));
+    zip.file("BLS-Course-Roster.pdf", await fillCourseRoster(cls, regs, rosterBytes, signatureBytes));
 
     // Per-student forms (all students in parallel)
     const perStudent = zip.folder("Per-Student")!;

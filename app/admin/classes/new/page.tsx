@@ -18,7 +18,7 @@ export default function NewClassPage() {
     end_time: "12:00",
     location: "",
     address: "",
-    instructor_name: "",
+    instructor_name: "Robert Baca",
     max_seats: 12,
     description: "",
     is_public: true,
