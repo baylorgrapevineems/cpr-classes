@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { ClassWithRegistrations, Registration } from "@/lib/types";
 import { formatDate, formatTime, toDateStr } from "@/lib/utils";
+import ImportRosterModal from "@/components/import-roster-modal";
 
 type AttendanceField = "attended" | "passed";
 
@@ -365,12 +366,15 @@ export default function AdminClassDetailPage() {
               </span>
             )}
           </div>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="inline-flex items-center gap-1.5 text-sm bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Add Student
-          </button>
+          <div className="flex items-center gap-2">
+            <ImportRosterModal classId={Number(id)} onImported={load} />
+            <button
+              onClick={() => setShowAdd(true)}
+              className="inline-flex items-center gap-1.5 text-sm bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Add Student
+            </button>
+          </div>
         </div>
 
         {/* Add student form */}
