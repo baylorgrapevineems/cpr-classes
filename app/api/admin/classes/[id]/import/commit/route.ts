@@ -34,8 +34,10 @@ export async function POST(
   const cls = clsRows[0];
   if (cls.is_cancelled) return NextResponse.json({ error: "This class has been cancelled." }, { status: 400 });
 
-  let remaining = cls.max_seats - cls.registered_count;
+  // A bulk import is a deliberate admin action, not public self-registration —
+  // don't let the class's seat cap silently drop people off a real roster.
   let added = 0;
+  let finalCount = cls.registered_count;
   const skipped: { row: string; reason: string }[] = [];
 
   for (const row of rows) {
@@ -46,10 +48,6 @@ export async function POST(
 
     if (!first_name || !last_name || !email) {
       skipped.push({ row: label, reason: "Missing required field" });
-      continue;
-    }
-    if (remaining <= 0) {
-      skipped.push({ row: label, reason: "Class is full" });
       continue;
     }
 
@@ -65,7 +63,11 @@ export async function POST(
               ${row.phone?.trim() || null}, ${row.address?.trim() || null}, ${row.notes?.trim() || null})
     `;
     added++;
-    remaining--;
+    finalCount++;
+  }
+
+  if (finalCount > cls.max_seats) {
+    await sql`UPDATE classes SET max_seats = ${finalCount} WHERE id = ${classId}`;
   }
 
   return NextResponse.json({ ok: true, added, skipped });
