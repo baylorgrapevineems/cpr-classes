@@ -53,7 +53,7 @@ export async function GET(
     // Fetch templates in parallel (skills checklist and eval built from scratch)
     const [rosterBytes, examBytes] =
       await Promise.all([
-        fetchTemplate(base, "2020-Guidelines-BLS-Course-Roster_ucm_506772.pdf"),
+        fetchTemplate(base, "2025-Guidelines-BLS-Course-Roster.pdf"),
         fetchTemplate(base, "EXAM SHEET.pdf"),
       ]);
 

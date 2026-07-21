@@ -427,15 +427,12 @@ export async function fillCourseRoster(
   const passedCount = regs.filter((r) => r.passed === true).length;
   set("No of Cards", String(passedCount > 0 ? passedCount : regs.length));
 
-  try { form.getCheckBox("Check Box 27").check(); } catch {}
+  try { form.getCheckBox("Check Box 1").check(); } catch {}
 
-  set("Date 2",                fmtDate(cls.class_date));
-  set("Course",                cls.course_type ?? "BLS");
-  set("Lead Instructor 2",     cls.instructor_name ?? "");
-  set("Lead Instructor ID# 2", instructorId);
+  set("Course", cls.course_type ?? "BLS");
 
   regs.slice(0, 10).forEach((reg, i) => {
-    const suffix = i === 0 ? "" : ` ${i + 1}`;
+    const suffix = ` ${i + 1}`;
     set(`Name${suffix}`,               `${reg.first_name} ${reg.last_name}`);
     set(`Email${suffix}`,              reg.email);
     set(`Mailing Address${suffix}`,    reg.address ?? "");
