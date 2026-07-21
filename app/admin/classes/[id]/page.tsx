@@ -441,18 +441,28 @@ export default function AdminClassDetailPage() {
                     <button
                       onClick={() => sendStudentQuiz(reg)}
                       disabled={sendingStudentQuiz === reg.id}
-                      className="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 px-2 py-1 rounded transition-colors"
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 px-2 py-1 rounded transition-colors"
                       title="Send quiz email to this student"
                     >
                       {sendingStudentQuiz === reg.id ? "…" : "Quiz"}
+                      {reg.quiz_sent_at && (
+                        <span title={`Sent ${new Date(reg.quiz_sent_at).toLocaleString()}`}>
+                          <Mail className="w-3 h-3 text-emerald-500" />
+                        </span>
+                      )}
                     </button>
                     <button
                       onClick={() => sendStudentEval(reg)}
                       disabled={sendingStudentEval === reg.id}
-                      className="text-xs text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 px-2 py-1 rounded transition-colors"
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 px-2 py-1 rounded transition-colors"
                       title="Send evaluation email to this student"
                     >
                       {sendingStudentEval === reg.id ? "…" : "Eval"}
+                      {reg.eval_sent_at && (
+                        <span title={`Sent ${new Date(reg.eval_sent_at).toLocaleString()}`}>
+                          <Mail className="w-3 h-3 text-emerald-500" />
+                        </span>
+                      )}
                     </button>
                     <button
                       onClick={() => setExpanded(expanded === reg.id ? null : reg.id)}

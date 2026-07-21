@@ -81,4 +81,5 @@ export interface CardRequest {
   class_id: number | null;
   class_title?: string | null;
   class_date?: string | null;
+  seen_at: string | null;
 }

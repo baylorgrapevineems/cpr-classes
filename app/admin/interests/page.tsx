@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Calendar, ChevronDown, ChevronUp, CheckCircle2, Trash2, MailOpen } from "lucide-react";
 import type { CardRequest, CPRClass } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
 export default function InterestsPage() {
+  const router = useRouter();
   const [requests, setRequests] = useState<CardRequest[]>([]);
   const [classes,  setClasses]  = useState<CPRClass[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -14,19 +17,47 @@ export default function InterestsPage() {
   const [assigning, setAssigning] = useState<Record<number, string>>({});
   const [busy,      setBusy]      = useState<number | null>(null);
   const [msg,       setMsg]       = useState<Record<number, string>>({});
+  const [deleting,  setDeleting]  = useState<number | null>(null);
+  const [clearing,  setClearing]  = useState(false);
+
+  const loadClasses = () =>
+    fetch("/api/admin/classes").then(r => r.json()).then(cls => setClasses(Array.isArray(cls) ? cls : []));
 
   useEffect(() => {
     Promise.all([
       fetch("/api/admin/card-requests").then(r => r.json()),
-      fetch("/api/classes").then(r => r.json()),
+      fetch("/api/admin/classes").then(r => r.json()),
     ]).then(([reqs, cls]) => {
       setRequests(Array.isArray(reqs) ? reqs : []);
       setClasses(Array.isArray(cls) ? cls : []);
     }).finally(() => setLoading(false));
   }, []);
 
-  const toggleAssign = (id: number) =>
+  const toggleAssign = (id: number) => {
+    const opening = !(id in assigning);
     setAssigning(a => ({ ...a, [id]: id in a ? undefined as unknown as string : "" }));
+    if (opening) loadClasses(); // pick up any class created since the page loaded
+  };
+
+  async function deleteRequest(req: CardRequest) {
+    if (!confirm(`Delete the card request from ${req.first_name} ${req.last_name}?`)) return;
+    setDeleting(req.id);
+    const res = await fetch(`/api/admin/card-requests/${req.id}`, { method: "DELETE" });
+    setDeleting(null);
+    if (res.ok) {
+      setRequests(reqs => reqs.filter(r => r.id !== req.id));
+      router.refresh(); // updates the nav badge count
+    } else {
+      setMsg(m => ({ ...m, [req.id]: "Delete failed — try again" }));
+    }
+  }
+
+  async function clearBadge() {
+    setClearing(true);
+    const res = await fetch("/api/admin/card-requests/clear", { method: "POST" });
+    setClearing(false);
+    if (res.ok) router.refresh(); // updates the nav badge count
+  }
 
   async function assign(req: CardRequest) {
     const classId = assigning[req.id];
@@ -76,7 +107,7 @@ export default function InterestsPage() {
               {new Date(req.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
             </p>
           </div>
-          <div className="shrink-0 text-right">
+          <div className="shrink-0 flex flex-col items-end gap-2">
             {isAssigned ? (
               <div className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
                 <CheckCircle2 className="w-4 h-4" />
@@ -90,6 +121,15 @@ export default function InterestsPage() {
                 Add to class {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
             )}
+            <button
+              onClick={() => deleteRequest(req)}
+              disabled={deleting === req.id}
+              title="Delete this card request"
+              className="inline-flex items-center gap-1 text-xs text-gray-300 hover:text-red-600 disabled:opacity-40 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {deleting === req.id ? "…" : "Delete"}
+            </button>
           </div>
         </div>
 
@@ -106,7 +146,7 @@ export default function InterestsPage() {
 
         {open && !isAssigned && (
           <div className="border-t border-gray-100 pt-3 space-y-2">
-            <label className="text-xs font-medium text-gray-600">Select an upcoming class:</label>
+            <label className="text-xs font-medium text-gray-600">Select a class:</label>
             <select
               value={assigning[req.id] ?? ""}
               onChange={e => setAssigning(a => ({ ...a, [req.id]: e.target.value }))}
@@ -115,17 +155,26 @@ export default function InterestsPage() {
               <option value="">— pick a class —</option>
               {classes.map(c => (
                 <option key={c.id} value={c.id}>
-                  {c.title} · {formatDate(c.class_date)}
+                  {c.title} · {formatDate(c.class_date)}{!c.is_public ? " (private)" : ""}
                 </option>
               ))}
             </select>
-            <button
-              disabled={!assigning[req.id] || busy === req.id}
-              onClick={() => assign(req)}
-              className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-medium py-2 rounded-lg transition-colors"
-            >
-              {busy === req.id ? "Assigning…" : "Confirm"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={!assigning[req.id] || busy === req.id}
+                onClick={() => assign(req)}
+                className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              >
+                {busy === req.id ? "Assigning…" : "Confirm"}
+              </button>
+              <Link
+                href="/admin/classes/new"
+                target="_blank"
+                className="text-xs text-gray-400 hover:text-gray-600 whitespace-nowrap underline underline-offset-2"
+              >
+                Don&apos;t see it? Create a class
+              </Link>
+            </div>
           </div>
         )}
       </div>
@@ -149,9 +198,20 @@ export default function InterestsPage() {
 
       {pending.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-            Pending ({pending.length})
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+              Pending ({pending.length})
+            </h2>
+            <button
+              onClick={clearBadge}
+              disabled={clearing}
+              title="Clear the notification badge without assigning these requests"
+              className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 disabled:opacity-40 transition-colors"
+            >
+              <MailOpen className="w-3.5 h-3.5" />
+              {clearing ? "Clearing…" : "Mark all as read"}
+            </button>
+          </div>
           {pending.map(r => <RequestCard key={r.id} req={r} />)}
         </section>
       )}

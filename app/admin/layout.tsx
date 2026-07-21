@@ -6,7 +6,7 @@ import { getDb } from "@/lib/db";
 async function getPendingCardCount(): Promise<number> {
   try {
     const sql = getDb();
-    const rows = await sql`SELECT COUNT(*)::int AS n FROM card_requests WHERE class_id IS NULL`;
+    const rows = await sql`SELECT COUNT(*)::int AS n FROM card_requests WHERE class_id IS NULL AND seen_at IS NULL`;
     return Number(rows[0]?.n ?? 0);
   } catch {
     return 0;

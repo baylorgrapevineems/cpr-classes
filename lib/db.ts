@@ -89,4 +89,5 @@ export async function initDb() {
     )`
   await sql`ALTER TABLE card_requests ADD COLUMN IF NOT EXISTS address TEXT
   `;
+  await sql`ALTER TABLE card_requests ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ`;
 }
