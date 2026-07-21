@@ -50,13 +50,27 @@ export default function AdminLoginPage() {
             <p className="text-sm text-gray-500 mt-0.5">Enter the admin password to continue.</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} autoComplete="on" className="space-y-4">
+            {/* Hidden username field: password managers expect one on login forms,
+                and without it some browsers treat the lone password field as a
+                "create new password" field and silently substitute their own
+                generated suggestion instead of submitting what was typed. */}
+            <input
+              type="text"
+              name="username"
+              autoComplete="username"
+              value="admin"
+              readOnly
+              hidden
+            />
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-600 flex items-center gap-1.5">
                 <Lock className="w-3 h-3" /> Password
               </label>
               <input
                 type="password"
+                name="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoFocus

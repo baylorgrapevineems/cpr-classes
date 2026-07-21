@@ -50,14 +50,22 @@ export default function CprCardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="w-9 h-9 bg-red-600 rounded-lg flex items-center justify-center shrink-0">
-            <Heart className="w-5 h-5 text-white fill-white" />
+        <div className="max-w-xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-red-600 rounded-lg flex items-center justify-center shrink-0">
+              <Heart className="w-5 h-5 text-white fill-white" />
+            </div>
+            <div>
+              <p className="font-bold text-gray-900 text-sm leading-tight">Baylor Grapevine EMS</p>
+              <p className="text-xs text-gray-500 leading-tight">AHA BLS CPR Classes</p>
+            </div>
           </div>
-          <div>
-            <p className="font-bold text-gray-900 text-sm leading-tight">Baylor Grapevine EMS</p>
-            <p className="text-xs text-gray-500 leading-tight">AHA BLS CPR Classes</p>
-          </div>
+          <Link
+            href="/admin/login"
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+          >
+            Admin
+          </Link>
         </div>
       </header>
 
