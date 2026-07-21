@@ -179,7 +179,6 @@ export default function EditClassPage() {
               required
               type="number"
               min={1}
-              max={100}
               value={form.max_seats}
               onChange={(e) => set("max_seats", parseInt(e.target.value) || 12)}
               className={inputCls}
