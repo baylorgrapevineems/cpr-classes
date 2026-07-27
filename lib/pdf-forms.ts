@@ -1,4 +1,4 @@
-import { PDFDocument, PDFPage, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, PDFPage, PDFName, rgb, StandardFonts } from "pdf-lib";
 import type { CPRClass, Registration } from "./types";
 
 // ─── Adult CPR and AED Skills Testing Checklist (built from scratch) ──────────
@@ -402,6 +402,7 @@ export async function fillCourseRoster(
 ): Promise<Uint8Array> {
   const doc  = await PDFDocument.load(templateBytes);
   const form = doc.getForm();
+  const rowFont = await doc.embedFont(StandardFonts.Helvetica);
 
   const set = (name: string, val: string) => {
     try { form.getTextField(name).setText(val); } catch {}
@@ -411,6 +412,8 @@ export async function fillCourseRoster(
   const tcId           = process.env.PDF_TRAINING_CENTER_ID ?? "";
   const instructorId   = process.env.PDF_INSTRUCTOR_ID ?? "";
   const instructorName = cls.instructor_name ?? process.env.PDF_LEAD_INSTRUCTOR ?? "";
+  const courseType     = cls.course_type ?? "BLS";
+  const dateStr        = fmtDate(cls.class_date);
 
   set("Lead Instructor",       instructorName);
   set("Lead Instructor ID#",   instructorId);
@@ -419,21 +422,73 @@ export async function fillCourseRoster(
   set("Training Center ID#",   tcId);
   set("Course Location",       cls.location);
   set("Address",               cls.address ?? "");
-  set("Course Start",          `${fmtDate(cls.class_date)} ${fmtTime(cls.start_time)}`);
-  set("Course End",            cls.end_time ? `${fmtDate(cls.class_date)} ${fmtTime(cls.end_time)}` : "");
+  set("Course Start",          `${dateStr} ${fmtTime(cls.start_time)}`);
+  set("Course End",            cls.end_time ? `${dateStr} ${fmtTime(cls.end_time)}` : "");
   set("Total Hours",           "4");
   set("Student-Manikin Ratio", "6:1");
-  set("Issue Date",            fmtDate(cls.class_date));
-  set("Date",                  fmtDate(cls.class_date));
+  set("Issue Date",            dateStr);
+  set("Date",                  dateStr);
 
   const passedCount = regs.filter((r) => r.passed === true).length;
   set("No of Cards", String(passedCount > 0 ? passedCount : regs.length));
 
   try { form.getCheckBox("Check Box 1").check(); } catch {}
 
-  set("Course", cls.course_type ?? "BLS");
+  set("Course", courseType);
 
-  regs.slice(0, 10).forEach((reg, i) => {
+  // ── Course Participants page: duplicate it for classes larger than 10 ──────
+  const ROWS_PER_PAGE = 10;
+  const PARTICIPANTS_PAGE_INDEX = 1;
+
+  type Rect = { x: number; y: number; width: number; height: number };
+
+  // Shared fields (Date/Course/Lead Instructor/...) have one widget per page —
+  // find the widget that actually sits on `page`, not just the field's first one.
+  const rectOnPage = (fieldName: string, page: PDFPage): Rect | null => {
+    try {
+      const field = form.getTextField(fieldName);
+      const annots = page.node.Annots();
+      if (!annots) return null;
+      for (const widget of field.acroField.getWidgets()) {
+        for (let i = 0; i < annots.size(); i++) {
+          if (doc.context.lookup(annots.get(i)) === widget.dict) return widget.getRectangle();
+        }
+      }
+    } catch {}
+    return null;
+  };
+
+  const participantsPage = doc.getPages()[PARTICIPANTS_PAGE_INDEX];
+  const headerRects = {
+    date:             rectOnPage("Date", participantsPage),
+    course:           rectOnPage("Course", participantsPage),
+    leadInstructor:   rectOnPage("Lead Instructor", participantsPage),
+    leadInstructorId: rectOnPage("Lead Instructor ID#", participantsPage),
+  };
+  const rowRects = Array.from({ length: ROWS_PER_PAGE }, (_, i) => {
+    const suffix = ` ${i + 1}`;
+    return {
+      name:               rectOnPage(`Name${suffix}`, participantsPage),
+      email:              rectOnPage(`Email${suffix}`, participantsPage),
+      mailingAddress:     rectOnPage(`Mailing Address${suffix}`, participantsPage),
+      telephone:          rectOnPage(`Telephone${suffix}`, participantsPage),
+      completeIncomplete: rectOnPage(`Complete-Incomplete${suffix}`, participantsPage),
+    };
+  });
+
+  // Copy the (still-blank) Participants page once per extra 10 students. The
+  // copied page's widgets are orphaned by pdf-lib (not part of the AcroForm's
+  // field list), so we strip them and draw plain text on top instead.
+  const extraPageCount = Math.max(0, Math.ceil(regs.length / ROWS_PER_PAGE) - 1);
+  const extraPages: PDFPage[] = [];
+  for (let p = 0; p < extraPageCount; p++) {
+    const [copied] = await doc.copyPages(doc, [PARTICIPANTS_PAGE_INDEX]);
+    copied.node.set(PDFName.of("Annots"), doc.context.obj([]));
+    doc.insertPage(PARTICIPANTS_PAGE_INDEX + 1 + p, copied);
+    extraPages.push(copied);
+  }
+
+  regs.slice(0, ROWS_PER_PAGE).forEach((reg, i) => {
     const suffix = ` ${i + 1}`;
     set(`Name${suffix}`,               `${reg.first_name} ${reg.last_name}`);
     set(`Email${suffix}`,              reg.email);
@@ -447,7 +502,7 @@ export async function fillCourseRoster(
 
   // Signature line lives only on page 1; capture its widget rect before
   // flatten() removes the form fields, then draw the image on top afterward.
-  let sigRect: { x: number; y: number; width: number; height: number } | null = null;
+  let sigRect: Rect | null = null;
   if (signatureBytes) {
     try {
       const sigField = form.getTextField("Lead Instructor Signature");
@@ -456,6 +511,30 @@ export async function fillCourseRoster(
   }
 
   form.flatten();
+
+  // Draw the repeated header + student rows onto each duplicated page.
+  const drawInBox = (page: PDFPage, rect: Rect | null, text: string) => {
+    if (!rect || !text) return;
+    page.drawText(text, { x: rect.x + 3, y: rect.y + 3, size: 8.5, font: rowFont, maxWidth: rect.width - 6 });
+  };
+
+  extraPages.forEach((page, pageIdx) => {
+    drawInBox(page, headerRects.date, dateStr);
+    drawInBox(page, headerRects.course, courseType);
+    drawInBox(page, headerRects.leadInstructor, instructorName);
+    drawInBox(page, headerRects.leadInstructorId, instructorId);
+
+    const batch = regs.slice(ROWS_PER_PAGE * (pageIdx + 1), ROWS_PER_PAGE * (pageIdx + 2));
+    batch.forEach((reg, i) => {
+      const r = rowRects[i];
+      drawInBox(page, r.name, `${reg.first_name} ${reg.last_name}`);
+      drawInBox(page, r.email, reg.email);
+      drawInBox(page, r.mailingAddress, reg.address ?? "");
+      drawInBox(page, r.telephone, reg.phone ?? "");
+      const status = reg.passed === true ? "Complete" : reg.passed === false ? "Incomplete" : "";
+      drawInBox(page, r.completeIncomplete, status);
+    });
+  });
 
   if (signatureBytes && sigRect) {
     const sigImage = await doc.embedPng(signatureBytes);
