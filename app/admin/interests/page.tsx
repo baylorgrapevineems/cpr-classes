@@ -76,6 +76,7 @@ export default function InterestsPage() {
         r.id === req.id ? { ...r, class_id: Number(classId), class_title: cls?.title } : r
       ));
       setAssigning(a => { const n = { ...a }; delete n[req.id]; return n; });
+      router.refresh(); // updates the nav badge count
     } else {
       setMsg(m => ({ ...m, [req.id]: "Failed — try again" }));
     }
